@@ -32,5 +32,19 @@ class SstiPayloadProviderTest {
         assertThat(provider.payloads().getFirst().expectedResult())
                 .isNotEqualTo(provider.payloads().getFirst().expectedResult());
     }
+
+    @Test
+    void previewCatalogMatchesProviderPayloadCounts() {
+        List<SstiPayloadProvider> providers = List.of(
+                new GenericPayloadProvider(), new Jinja2PayloadProvider(),
+                new TwigPayloadProvider(), new FreeMarkerPayloadProvider(),
+                new VelocityPayloadProvider(), new ThymeleafPayloadProvider(),
+                new SmartyPayloadProvider());
+
+        for (SstiPayloadProvider provider : providers) {
+            assertThat(SstiPayloadPatternCatalog.patternsFor(provider.engine()))
+                    .hasSameSizeAs(provider.payloads());
+        }
+    }
 }
 

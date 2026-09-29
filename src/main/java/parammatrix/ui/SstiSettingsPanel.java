@@ -3,6 +3,7 @@ package parammatrix.ui;
 import parammatrix.config.SstiConfig;
 import parammatrix.core.ExtensionController;
 import parammatrix.testing.ssti.SstiEngine;
+import parammatrix.testing.ssti.SstiPayloadPatternCatalog;
 import parammatrix.testing.ssti.SstiProgressListener;
 
 import javax.swing.BorderFactory;
@@ -28,6 +29,7 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 public final class SstiSettingsPanel extends JPanel {
@@ -87,7 +89,24 @@ public final class SstiSettingsPanel extends JPanel {
         content.add(grid);
         content.add(Box.createVerticalStrut(14));
         content.add(policyPanel());
+        content.add(Box.createVerticalStrut(14));
+        content.add(payloadPreview());
         return content;
+    }
+
+    private JPanel payloadPreview() {
+        List<Object[]> rows = new java.util.ArrayList<>();
+        for (SstiEngine engine : SstiEngine.values()) {
+            for (String pattern : SstiPayloadPatternCatalog.patternsFor(engine)) {
+                rows.add(new Object[] {displayName(engine),
+                        SstiPayloadPatternCatalog.displayPattern(pattern),
+                        "Arithmetic evaluation"});
+            }
+        }
+        return PayloadPreviewPanel.create("Payloads sent",
+                "<left> and <right> are randomized from 100–899; the marker is unique per request.",
+                new String[] {"Engine", "Payload pattern", "Detection"},
+                rows.toArray(Object[][]::new), 1);
     }
 
     private JPanel engineCard(SstiEngine engine) {

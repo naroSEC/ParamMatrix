@@ -3,7 +3,9 @@ package parammatrix.ui;
 import parammatrix.config.DatabaseStressConfig;
 import parammatrix.core.ExtensionController;
 import parammatrix.testing.database.DatabaseProgressListener;
+import parammatrix.testing.database.DatabaseStressPayload;
 import parammatrix.testing.database.DatabaseType;
+import parammatrix.testing.database.SafeSyntaxPayloadProvider;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -17,7 +19,9 @@ import javax.swing.JProgressBar;
 import javax.swing.JRadioButton;
 import javax.swing.JSeparator;
 import javax.swing.JSpinner;
+import javax.swing.JTextArea;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import java.awt.BorderLayout;
@@ -26,9 +30,11 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 public final class DatabaseStressPanel extends JPanel {
+    private static final Map<DatabaseType, String> DESCRIPTIONS = descriptions();
     private final ExtensionController controller;
     private final DatabaseStressConfig config;
     private final Map<DatabaseType, JCheckBox> selections = new EnumMap<>(DatabaseType.class);
@@ -74,24 +80,61 @@ public final class DatabaseStressPanel extends JPanel {
     private JPanel content() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        JPanel databases = new JPanel(new GridLayout(0, 4, 10, 10));
-        databases.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder("Error signatures"),
-                new EmptyBorder(10, 10, 10, 10)));
+        JPanel databases = new JPanel(new GridLayout(0, 2, 12, 12));
         for (DatabaseType database : DatabaseType.values()) {
-            JCheckBox box = new JCheckBox(display(database), config.isSelected(database));
-            box.setFont(box.getFont().deriveFont(Font.BOLD));
-            box.addActionListener(ignored -> {
-                config.setSelected(database, box.isSelected());
-                updateSelectionStatus();
-            });
-            selections.put(database, box);
-            databases.add(box);
+            databases.add(databaseCard(database));
         }
+        JPanel placeholder = new JPanel(new BorderLayout());
+        placeholder.setBorder(BorderFactory.createDashedBorder(null));
+        placeholder.add(new JLabel("Additional database signature families can be added here",
+                SwingConstants.CENTER), BorderLayout.CENTER);
+        databases.add(placeholder);
         panel.add(databases);
         panel.add(Box.createVerticalStrut(14));
         panel.add(policyPanel());
+        panel.add(Box.createVerticalStrut(14));
+        panel.add(payloadPreview());
         return panel;
+    }
+
+    private JPanel payloadPreview() {
+        List<DatabaseStressPayload> payloads = new SafeSyntaxPayloadProvider().payloads();
+        Object[][] rows = payloads.stream()
+                .map(payload -> new Object[] {payload.name(), visible(payload.value()),
+                        "Syntax boundary"})
+                .toArray(Object[][]::new);
+        return PayloadPreviewPanel.create("Payloads sent",
+                "These exact short strings are tested; no SQL statements or delay payloads are used.",
+                new String[] {"Name", "Payload", "Purpose"}, rows, 1);
+    }
+
+    private static String visible(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    }
+
+    private JPanel databaseCard(DatabaseType database) {
+        JPanel card = new JPanel(new BorderLayout(10, 4));
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createEtchedBorder(), new EmptyBorder(12, 12, 12, 12)));
+        JCheckBox selected = new JCheckBox(display(database), config.isSelected(database));
+        selected.setFont(selected.getFont().deriveFont(Font.BOLD,
+                selected.getFont().getSize2D() + 1f));
+        selected.addActionListener(ignored -> {
+            config.setSelected(database, selected.isSelected());
+            updateSelectionStatus();
+        });
+        selections.put(database, selected);
+        JTextArea description = new JTextArea(DESCRIPTIONS.get(database));
+        description.setEditable(false);
+        description.setOpaque(false);
+        description.setLineWrap(true);
+        description.setWrapStyleWord(true);
+        description.setFocusable(false);
+        description.setRows(2);
+        card.add(selected, BorderLayout.NORTH);
+        card.add(description, BorderLayout.CENTER);
+        card.setPreferredSize(new Dimension(330, 92));
+        return card;
     }
 
     private JPanel policyPanel() {
@@ -233,7 +276,7 @@ public final class DatabaseStressPanel extends JPanel {
         }
     }
 
-    private String display(DatabaseType database) {
+    private static String display(DatabaseType database) {
         return switch (database) {
             case GENERIC -> "Generic SQL/JDBC";
             case MYSQL -> "MySQL / MariaDB";
@@ -243,5 +286,24 @@ public final class DatabaseStressPanel extends JPanel {
             case SQLITE -> "SQLite";
             case DB2 -> "IBM DB2";
         };
+    }
+
+    private static Map<DatabaseType, String> descriptions() {
+        Map<DatabaseType, String> values = new EnumMap<>(DatabaseType.class);
+        values.put(DatabaseType.GENERIC,
+                "Common JDBC, ODBC, SQLSTATE, and ORM error patterns across database stacks.");
+        values.put(DatabaseType.MYSQL,
+                "MySQL and MariaDB syntax, driver, and query-processing error signatures.");
+        values.put(DatabaseType.POSTGRESQL,
+                "PostgreSQL parser, type, and server error messages exposed in responses.");
+        values.put(DatabaseType.MSSQL,
+                "Microsoft SQL Server and SQL Server driver error signatures.");
+        values.put(DatabaseType.ORACLE,
+                "Oracle ORA errors and common Oracle JDBC exception patterns.");
+        values.put(DatabaseType.SQLITE,
+                "SQLite parser, query, and embedded database error messages.");
+        values.put(DatabaseType.DB2,
+                "IBM Db2 SQLCODE, SQLSTATE, and driver-specific error signatures.");
+        return values;
     }
 }

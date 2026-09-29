@@ -46,7 +46,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class BurpExtension implements burp.api.montoya.BurpExtension {
     @Override
     public void initialize(MontoyaApi api) {
-        api.extension().setName("ParamMatrix - Parameter Analyzer");
+        api.extension().setName("ParamMatrix");
 
         ExtensionConfig config = new ExtensionConfig();
         SstiConfig sstiConfig = new SstiConfig();
@@ -79,7 +79,7 @@ public final class BurpExtension implements burp.api.montoya.BurpExtension {
 
         MainTab mainTab = createUi(api, repository, sstiResults, databaseResults, config,
                 sstiConfig, databaseConfig, controller);
-        api.userInterface().registerSuiteTab("Parameter Analyzer", mainTab);
+        api.userInterface().registerSuiteTab("ParamMatrix", mainTab);
         api.userInterface().registerContextMenuItemsProvider(
                 new ParameterAnalyzerContextMenu(controller));
         api.proxy().registerResponseHandler(new AutoAnalyzer(controller));

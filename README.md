@@ -17,6 +17,7 @@ page are never tested against another endpoint.
 - Tests reflections in batches, individually, or with individual verification of batch positives
 - Records the marker, response excerpt, test exchange, and estimated reflection context
 - Runs non-destructive, engine-specific SSTI arithmetic probes with exact evaluated-result matching
+- Shows the SSTI payload patterns and exact database stress strings before a test is started
 - Keeps SSTI findings in a separate evidence-focused result view
 - Applies short database syntax stress strings and detects new DB/driver error signatures
 - Separates confirmed DB errors from low-confidence response behavior changes
@@ -50,7 +51,7 @@ On Linux or macOS:
 The extension JAR is written to:
 
 ```text
-build/libs/param-matrix-1.3.0.jar
+build/libs/param-matrix-1.3.1.jar
 ```
 
 jsoup is bundled in the output JAR. The Montoya API is supplied by Burp and is therefore declared as
@@ -60,10 +61,14 @@ a compile-only dependency.
 
 1. Open **Extensions > Installed** in Burp Suite.
 2. Click **Add** and select **Java**.
-3. Choose `build/libs/param-matrix-1.3.0.jar`.
-4. Confirm that the **Parameter Analyzer** tab appears.
+3. Choose `build/libs/param-matrix-1.3.1.jar`.
+4. Confirm that the **ParamMatrix** tab appears.
 
 Automatic analysis is disabled on first load.
+
+The first inner tab, **Discovery & Reflection**, contains discovered parameter candidates and their
+reflection status. SSTI and database findings are intentionally kept in the separate **SSTI Results**
+and **DB Error Results** tabs.
 
 ## Manual analysis
 

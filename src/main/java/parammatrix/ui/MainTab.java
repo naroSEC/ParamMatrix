@@ -44,7 +44,7 @@ public final class MainTab extends JPanel {
                 new JScrollPane(table), details);
         split.setResizeWeight(0.48);
         JTabbedPane tabs = new JTabbedPane();
-        tabs.addTab("Results", split);
+        tabs.addTab("Discovery & Reflection", split);
         tabs.addTab("SSTI Results", new SstiResultsPanel(api, sstiResults));
         tabs.addTab("DB Error Results", new DatabaseResultsPanel(api, databaseResults));
         tabs.addTab("Scan", new HistoryScanPanel(controller, sstiConfig, databaseConfig));
