@@ -23,7 +23,8 @@
   request registry.
 - `analysis` — reflection context and evidence extraction.
 - `testing` — test-module interface, reflection implementation and request-budget coordinator.
-- `testing.ssti` — attack-free Phase-6 extension interfaces, engines, payload and result schema.
+- `testing.ssti` — safe arithmetic payload providers, execution coordinator, engine and result schema.
+- `testing.database` — syntax stress payloads, DB error testing, confirmation and result schema.
 - `storage` — canonical page/name result repository and UI change notifications.
 - `ui` — results table, Burp message editors, evidence view, settings, queue controls and SSTI placeholder.
 
@@ -76,8 +77,20 @@ parameters or adds new ones; Cookie parameters are never selected as an injectio
 individual probes share a strict per-page request budget. Scope restriction, delay, concurrency, pause,
 pending-queue clear and generated-request fingerprints are independent controls.
 
-## SSTI extension seam
+## SSTI pipeline
 
-SSTI is a peer testing module, not a subclass of reflection. `SstiTestEngine` accepts any candidate and
-a selected engine set. `SstiPayloadProvider` is engine-specific. A future policy layer may pass every
-candidate or only reflected candidates, but the engine interface itself has no reflection dependency.
+SSTI is a peer testing module, not a subclass of reflection. `SstiCoordinator` applies the selected
+parameter policy and per-page request budget, then obtains randomized arithmetic probes from each
+`SstiPayloadProvider`. `DefaultSstiTestEngine` mutates the candidate's own original request and records
+a detection only when the uniquely wrapped evaluated result appears in the response. `SstiResultRepository`
+feeds the independent SSTI result table and Burp message-editor detail view. Reflection filtering is an
+optional caller policy rather than an engine dependency.
+
+## Database error pipeline
+
+Database testing is another peer module. `SafeSyntaxPayloadProvider` supplies only short quote,
+parenthesis, and backslash boundaries. `DatabaseErrorTestEngine` compares the original and test response
+and delegates new-signature matching to `DatabaseErrorSignatureAnalyzer`. `DatabaseTestCoordinator`
+enforces an independent per-page budget and optionally repeats positive signature matches. Confirmed
+signatures, low-confidence behavior changes, HTTP deltas, evidence, and exchanges are stored in
+`DatabaseResultRepository` and rendered in a dedicated result view.

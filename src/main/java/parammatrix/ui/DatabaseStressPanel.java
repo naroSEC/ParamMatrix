@@ -1,9 +1,9 @@
 package parammatrix.ui;
 
-import parammatrix.config.SstiConfig;
+import parammatrix.config.DatabaseStressConfig;
 import parammatrix.core.ExtensionController;
-import parammatrix.testing.ssti.SstiEngine;
-import parammatrix.testing.ssti.SstiProgressListener;
+import parammatrix.testing.database.DatabaseProgressListener;
+import parammatrix.testing.database.DatabaseType;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -17,9 +17,7 @@ import javax.swing.JProgressBar;
 import javax.swing.JRadioButton;
 import javax.swing.JSeparator;
 import javax.swing.JSpinner;
-import javax.swing.JTextArea;
 import javax.swing.SpinnerNumberModel;
-import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import java.awt.BorderLayout;
@@ -30,17 +28,16 @@ import java.awt.GridLayout;
 import java.util.EnumMap;
 import java.util.Map;
 
-public final class SstiSettingsPanel extends JPanel {
-    private static final Map<SstiEngine, String> DESCRIPTIONS = descriptions();
-    private final Map<SstiEngine, JCheckBox> selections = new EnumMap<>(SstiEngine.class);
+public final class DatabaseStressPanel extends JPanel {
     private final ExtensionController controller;
-    private final SstiConfig config;
+    private final DatabaseStressConfig config;
+    private final Map<DatabaseType, JCheckBox> selections = new EnumMap<>(DatabaseType.class);
     private final JLabel selectionStatus = new JLabel();
     private final JLabel runStatus = new JLabel("Ready");
     private final JProgressBar progress = new JProgressBar();
-    private final JButton start = new JButton("Start SSTI test");
+    private final JButton start = new JButton("Start DB error test");
 
-    public SstiSettingsPanel(ExtensionController controller, SstiConfig config) {
+    public DatabaseStressPanel(ExtensionController controller, DatabaseStressConfig config) {
         super(new BorderLayout(0, 16));
         this.controller = controller;
         this.config = config;
@@ -55,10 +52,10 @@ public final class SstiSettingsPanel extends JPanel {
         JPanel panel = new JPanel(new BorderLayout(20, 0));
         JPanel copy = new JPanel();
         copy.setLayout(new BoxLayout(copy, BoxLayout.Y_AXIS));
-        JLabel title = new JLabel("SSTI Test");
+        JLabel title = new JLabel("Database Error Stress Test");
         title.setFont(title.getFont().deriveFont(Font.BOLD, title.getFont().getSize2D() + 7f));
         JLabel subtitle = new JLabel(
-                "Run non-destructive arithmetic evaluation probes against discovered parameters.");
+                "Apply non-destructive syntax stress strings and compare database error behavior.");
         subtitle.setBorder(new EmptyBorder(4, 0, 0, 0));
         copy.add(title);
         copy.add(subtitle);
@@ -75,52 +72,35 @@ public final class SstiSettingsPanel extends JPanel {
     }
 
     private JPanel content() {
-        JPanel content = new JPanel();
-        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
-        JPanel grid = new JPanel(new GridLayout(0, 2, 12, 12));
-        for (SstiEngine engine : SstiEngine.values()) grid.add(engineCard(engine));
-        JPanel placeholder = new JPanel(new BorderLayout());
-        placeholder.setBorder(BorderFactory.createDashedBorder(null));
-        placeholder.add(new JLabel("Additional providers can implement SstiPayloadProvider",
-                SwingConstants.CENTER), BorderLayout.CENTER);
-        grid.add(placeholder);
-        content.add(grid);
-        content.add(Box.createVerticalStrut(14));
-        content.add(policyPanel());
-        return content;
-    }
-
-    private JPanel engineCard(SstiEngine engine) {
-        JPanel card = new JPanel(new BorderLayout(10, 4));
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEtchedBorder(), new EmptyBorder(12, 12, 12, 12)));
-        JCheckBox selected = new JCheckBox(displayName(engine), config.isSelected(engine));
-        selected.setFont(selected.getFont().deriveFont(Font.BOLD,
-                selected.getFont().getSize2D() + 1f));
-        selected.addActionListener(ignored -> {
-            config.setSelected(engine, selected.isSelected());
-            updateSelectionStatus();
-        });
-        selections.put(engine, selected);
-        JTextArea description = new JTextArea(DESCRIPTIONS.get(engine));
-        description.setEditable(false);
-        description.setOpaque(false);
-        description.setLineWrap(true);
-        description.setWrapStyleWord(true);
-        description.setFocusable(false);
-        description.setRows(2);
-        card.add(selected, BorderLayout.NORTH);
-        card.add(description, BorderLayout.CENTER);
-        card.setPreferredSize(new Dimension(330, 92));
-        return card;
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        JPanel databases = new JPanel(new GridLayout(0, 4, 10, 10));
+        databases.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createTitledBorder("Error signatures"),
+                new EmptyBorder(10, 10, 10, 10)));
+        for (DatabaseType database : DatabaseType.values()) {
+            JCheckBox box = new JCheckBox(display(database), config.isSelected(database));
+            box.setFont(box.getFont().deriveFont(Font.BOLD));
+            box.addActionListener(ignored -> {
+                config.setSelected(database, box.isSelected());
+                updateSelectionStatus();
+            });
+            selections.put(database, box);
+            databases.add(box);
+        }
+        panel.add(databases);
+        panel.add(Box.createVerticalStrut(14));
+        panel.add(policyPanel());
+        return panel;
     }
 
     private JPanel policyPanel() {
-        JPanel panel = new JPanel(new BorderLayout(20, 0));
+        JPanel panel = new JPanel(new GridLayout(1, 3, 14, 0));
         panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder("Test policy"), new EmptyBorder(8, 10, 10, 10)));
-        JPanel scope = new JPanel();
-        scope.setLayout(new BoxLayout(scope, BoxLayout.Y_AXIS));
+                BorderFactory.createTitledBorder("Test policy"),
+                new EmptyBorder(10, 10, 10, 10)));
+        JPanel targets = new JPanel();
+        targets.setLayout(new BoxLayout(targets, BoxLayout.Y_AXIS));
         ButtonGroup group = new ButtonGroup();
         JRadioButton all = new JRadioButton("Test all discovered parameters",
                 !config.onlyReflectedParameters.get());
@@ -130,27 +110,29 @@ public final class SstiSettingsPanel extends JPanel {
         reflected.addActionListener(ignored -> config.onlyReflectedParameters.set(true));
         group.add(all);
         group.add(reflected);
-        scope.add(all);
-        scope.add(reflected);
+        targets.add(new JLabel("Targets"));
+        targets.add(all);
+        targets.add(reflected);
+
+        JPanel verification = new JPanel();
+        verification.setLayout(new BoxLayout(verification, BoxLayout.Y_AXIS));
+        verification.add(new JLabel("Confirmation"));
+        JCheckBox verify = new JCheckBox("Repeat recognized DB errors",
+                config.verifyPositiveResults.get());
+        verify.addActionListener(ignored -> config.verifyPositiveResults.set(verify.isSelected()));
+        verification.add(verify);
+        verification.add(new JLabel("Literal quotes and delimiters only"));
 
         JPanel limits = new JPanel();
         limits.setLayout(new BoxLayout(limits, BoxLayout.Y_AXIS));
         limits.add(new JLabel("Safety limits"));
-        limits.add(spinnerRow("Maximum requests per page", config.maximumRequestsPerPage.get(),
+        limits.add(spinnerRow("Requests/page", config.maximumRequestsPerPage.get(),
                 1, 500, config.maximumRequestsPerPage::set));
-        limits.add(spinnerRow("Request delay (ms)", config.requestDelayMillis.get(),
+        limits.add(spinnerRow("Delay (ms)", config.requestDelayMillis.get(),
                 0, 60_000, config.requestDelayMillis::set));
-
-        JPanel method = new JPanel();
-        method.setLayout(new BoxLayout(method, BoxLayout.Y_AXIS));
-        JLabel title = new JLabel("Detection method");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        method.add(title);
-        method.add(new JLabel("Randomized arithmetic evaluation"));
-        method.add(new JLabel("Exact marker + evaluated-result matching"));
-        panel.add(scope, BorderLayout.WEST);
-        panel.add(limits, BorderLayout.CENTER);
-        panel.add(method, BorderLayout.EAST);
+        panel.add(targets);
+        panel.add(verification);
+        panel.add(limits);
         return panel;
     }
 
@@ -170,44 +152,44 @@ public final class SstiSettingsPanel extends JPanel {
         panel.add(new JSeparator());
         panel.add(Box.createVerticalStrut(10));
         JLabel notice = new JLabel(
-                "Only non-destructive arithmetic payloads are sent. Burp scope and queue controls apply.");
+                "No SQL statements, time delays, data access, or destructive payloads are used.");
         notice.setBorder(new EmptyBorder(5, 8, 8, 8));
         panel.add(notice);
         JPanel action = new JPanel(new BorderLayout(12, 0));
-        start.setPreferredSize(new Dimension(180, 38));
+        start.setPreferredSize(new Dimension(190, 38));
         start.addActionListener(ignored -> startTest());
         progress.setStringPainted(true);
         progress.setString("Ready");
         action.add(start, BorderLayout.WEST);
         action.add(progress, BorderLayout.CENTER);
         panel.add(action);
-        JPanel statusRow = new JPanel(new BorderLayout());
-        statusRow.add(runStatus, BorderLayout.WEST);
-        statusRow.add(selectionStatus, BorderLayout.EAST);
-        panel.add(statusRow);
+        JPanel status = new JPanel(new BorderLayout());
+        status.add(runStatus, BorderLayout.WEST);
+        status.add(selectionStatus, BorderLayout.EAST);
+        panel.add(status);
         return panel;
     }
 
     private void startTest() {
-        if (config.selectedEngines().isEmpty()) {
-            runStatus.setText("Select at least one template engine.");
+        if (config.selectedDatabases().isEmpty()) {
+            runStatus.setText("Select at least one error signature family.");
             return;
         }
         start.setEnabled(false);
         progress.setIndeterminate(true);
         progress.setString("Preparing...");
-        controller.submitSstiTest(config.snapshot(), new UiProgress());
+        controller.submitDatabaseTest(config.snapshot(), new UiProgress());
     }
 
     private void selectAll(boolean selected) {
         config.selectAll(selected);
-        selections.forEach((engine, checkBox) -> checkBox.setSelected(selected));
+        selections.values().forEach(box -> box.setSelected(selected));
         updateSelectionStatus();
     }
 
     private void updateSelectionStatus() {
-        long count = config.selectedEngines().size();
-        selectionStatus.setText(count + " engine" + (count == 1 ? "" : "s") + " selected");
+        int count = config.selectedDatabases().size();
+        selectionStatus.setText(count + " signature famil" + (count == 1 ? "y" : "ies") + " selected");
     }
 
     private void onEdt(Runnable action) {
@@ -215,7 +197,7 @@ public final class SstiSettingsPanel extends JPanel {
         else SwingUtilities.invokeLater(action);
     }
 
-    private final class UiProgress implements SstiProgressListener {
+    private final class UiProgress implements DatabaseProgressListener {
         @Override public void started(int pages, int parameters) {
             onEdt(() -> {
                 progress.setIndeterminate(false);
@@ -237,7 +219,7 @@ public final class SstiSettingsPanel extends JPanel {
                 progress.setIndeterminate(false);
                 progress.setValue(progress.getMaximum());
                 progress.setString("Complete");
-                runStatus.setText(resultCount + " SSTI test results recorded");
+                runStatus.setText(resultCount + " database stress results recorded");
                 start.setEnabled(true);
             });
         }
@@ -251,27 +233,15 @@ public final class SstiSettingsPanel extends JPanel {
         }
     }
 
-    private static String displayName(SstiEngine engine) {
-        return switch (engine) {
-            case GENERIC -> "Generic";
-            case JINJA2 -> "Jinja2";
-            case TWIG -> "Twig";
-            case FREEMARKER -> "FreeMarker";
-            case VELOCITY -> "Velocity";
-            case THYMELEAF -> "Thymeleaf";
-            case SMARTY -> "Smarty";
+    private String display(DatabaseType database) {
+        return switch (database) {
+            case GENERIC -> "Generic SQL/JDBC";
+            case MYSQL -> "MySQL / MariaDB";
+            case POSTGRESQL -> "PostgreSQL";
+            case MSSQL -> "Microsoft SQL Server";
+            case ORACLE -> "Oracle";
+            case SQLITE -> "SQLite";
+            case DB2 -> "IBM DB2";
         };
-    }
-
-    private static Map<SstiEngine, String> descriptions() {
-        Map<SstiEngine, String> values = new EnumMap<>(SstiEngine.class);
-        values.put(SstiEngine.GENERIC, "Common curly-brace and dollar-expression evaluation probes.");
-        values.put(SstiEngine.JINJA2, "Python/Jinja arithmetic expression behavior.");
-        values.put(SstiEngine.TWIG, "PHP/Twig arithmetic expression behavior.");
-        values.put(SstiEngine.FREEMARKER, "Java FreeMarker dollar-expression evaluation.");
-        values.put(SstiEngine.VELOCITY, "Apache Velocity safe variable assignment and evaluation.");
-        values.put(SstiEngine.THYMELEAF, "Thymeleaf inline standard-expression evaluation.");
-        values.put(SstiEngine.SMARTY, "PHP Smarty arithmetic delimiter evaluation.");
-        return values;
     }
 }

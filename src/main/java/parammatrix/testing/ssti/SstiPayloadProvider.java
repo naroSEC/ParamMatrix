@@ -6,4 +6,3 @@ public interface SstiPayloadProvider {
     SstiEngine engine();
     List<SstiPayload> payloads();
 }
-

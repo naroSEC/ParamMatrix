@@ -8,10 +8,11 @@ public record ScanOptions(
         boolean get,
         boolean post,
         boolean runReflectionTests,
+        boolean runSstiTests,
+        boolean runDatabaseTests,
         List<String> excludedPathRules) {
 
     public ScanOptions {
         excludedPathRules = excludedPathRules == null ? List.of() : List.copyOf(excludedPathRules);
     }
 }
-

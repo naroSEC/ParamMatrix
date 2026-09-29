@@ -1,0 +1,56 @@
+package parammatrix.ui;
+
+import burp.api.montoya.MontoyaApi;
+import parammatrix.storage.DatabaseResultRepository;
+
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.JTable;
+import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
+import javax.swing.border.EmptyBorder;
+import javax.swing.table.TableRowSorter;
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.Font;
+
+public final class DatabaseResultsPanel extends JPanel {
+    private final DatabaseResultTableModel model = new DatabaseResultTableModel();
+    private final JTable table = new JTable(model);
+
+    public DatabaseResultsPanel(MontoyaApi api, DatabaseResultRepository repository) {
+        super(new BorderLayout(0, 8));
+        setBorder(new EmptyBorder(10, 10, 10, 10));
+        DatabaseResultDetailPanel details = new DatabaseResultDetailPanel(api);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setAutoCreateRowSorter(true);
+        table.setRowSorter(new TableRowSorter<>(model));
+        table.getSelectionModel().addListSelectionListener(event -> {
+            if (event.getValueIsAdjusting() || table.getSelectedRow() < 0) return;
+            details.showResult(model.row(table.convertRowIndexToModel(table.getSelectedRow())));
+        });
+        JPanel toolbar = new JPanel(new BorderLayout());
+        JLabel title = new JLabel("Database Error Test Results");
+        title.setFont(title.getFont().deriveFont(Font.BOLD, title.getFont().getSize2D() + 2f));
+        JButton clear = new JButton("Clear results");
+        clear.addActionListener(ignored -> repository.clear());
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        actions.add(clear);
+        toolbar.add(title, BorderLayout.WEST);
+        toolbar.add(actions, BorderLayout.EAST);
+        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
+                new JScrollPane(table), details);
+        split.setResizeWeight(0.48);
+        add(toolbar, BorderLayout.NORTH);
+        add(split, BorderLayout.CENTER);
+        repository.addListener(() -> SwingUtilities.invokeLater(() -> {
+            model.setRows(repository.all());
+            if (table.getRowCount() > 0 && table.getSelectedRow() < 0) {
+                table.setRowSelectionInterval(0, 0);
+            }
+        }));
+    }
+}

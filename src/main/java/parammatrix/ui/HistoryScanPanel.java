@@ -1,6 +1,8 @@
 package parammatrix.ui;
 
 import parammatrix.core.ExtensionController;
+import parammatrix.config.SstiConfig;
+import parammatrix.config.DatabaseStressConfig;
 import parammatrix.scan.ScanOptions;
 import parammatrix.scan.ScanProgressListener;
 import parammatrix.scan.ScanSummary;
@@ -30,21 +32,28 @@ import java.util.List;
 
 public final class HistoryScanPanel extends JPanel {
     private final ExtensionController controller;
+    private final SstiConfig sstiConfig;
+    private final DatabaseStressConfig databaseConfig;
     private final JCheckBox proxyHistory = new JCheckBox("Proxy History", true);
     private final JCheckBox siteMap = new JCheckBox("Site Map / Crawl", true);
     private final JToggleButton get = new JToggleButton("GET", true);
     private final JToggleButton post = new JToggleButton("POST", true);
     private final JRadioButton discoverOnly = new JRadioButton("Discover only");
     private final JRadioButton discoverAndTest = new JRadioButton("Discover + reflection test", true);
+    private final JCheckBox includeSsti = new JCheckBox("Include SSTI testing", false);
+    private final JCheckBox includeDatabase = new JCheckBox("Include DB error testing", false);
     private final JTextArea exclusions = new JTextArea(8, 42);
     private final JButton start = new JButton("Start history scan");
     private final JProgressBar progress = new JProgressBar();
     private final JLabel status = new JLabel("Ready");
     private final JLabel summary = new JLabel(" ");
 
-    public HistoryScanPanel(ExtensionController controller) {
+    public HistoryScanPanel(ExtensionController controller, SstiConfig sstiConfig,
+                            DatabaseStressConfig databaseConfig) {
         super(new BorderLayout(0, 14));
         this.controller = controller;
+        this.sstiConfig = sstiConfig;
+        this.databaseConfig = databaseConfig;
         setBorder(new EmptyBorder(18, 20, 18, 20));
         add(header(), BorderLayout.NORTH);
         add(content(), BorderLayout.CENTER);
@@ -111,10 +120,16 @@ public final class HistoryScanPanel extends JPanel {
         group.add(discoverAndTest);
         panel.add(discoverOnly);
         panel.add(discoverAndTest);
+        panel.add(includeSsti);
+        panel.add(includeDatabase);
         panel.add(Box.createVerticalStrut(8));
         JLabel safety = new JLabel("Active tests respect scope, request budget, delay, and queue settings.");
         safety.setToolTipText("Configure these controls in the Settings tab");
         panel.add(safety);
+        includeSsti.setToolTipText(
+                "Uses the engines, target policy, delay, and request limit configured in SSTI Test");
+        includeDatabase.setToolTipText(
+                "Uses the signature families, target policy, delay, and request limit configured in DB Stress Test");
         return panel;
     }
 
@@ -176,11 +191,34 @@ public final class HistoryScanPanel extends JPanel {
         }
         List<String> rules = exclusions.getText().lines().toList();
         ScanOptions options = new ScanOptions(proxyHistory.isSelected(), siteMap.isSelected(),
-                get.isSelected(), post.isSelected(), discoverAndTest.isSelected(), rules);
+                get.isSelected(), post.isSelected(), discoverAndTest.isSelected(),
+                includeSsti.isSelected(), includeDatabase.isSelected(), rules);
         start.setEnabled(false);
         progress.setIndeterminate(true);
         progress.setString("Collecting traffic...");
         status.setText("Reading Burp history");
+        if (includeSsti.isSelected() && sstiConfig.selectedEngines().isEmpty()) {
+            showValidation("Select at least one engine in SSTI Test.");
+            start.setEnabled(true);
+            return;
+        }
+        if (includeSsti.isSelected() && sstiConfig.onlyReflectedParameters.get()
+                && discoverOnly.isSelected()) {
+            showValidation("Reflected-only SSTI requires Discover + reflection test.");
+            start.setEnabled(true);
+            return;
+        }
+        if (includeDatabase.isSelected() && databaseConfig.selectedDatabases().isEmpty()) {
+            showValidation("Select at least one signature family in DB Stress Test.");
+            start.setEnabled(true);
+            return;
+        }
+        if (includeDatabase.isSelected() && databaseConfig.onlyReflectedParameters.get()
+                && discoverOnly.isSelected()) {
+            showValidation("Reflected-only DB testing requires Discover + reflection test.");
+            start.setEnabled(true);
+            return;
+        }
         summary.setText(" ");
         controller.submitHistoryScan(options, new UiProgress());
     }

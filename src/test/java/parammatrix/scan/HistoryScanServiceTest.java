@@ -30,7 +30,7 @@ class HistoryScanServiceTest {
 
         HistoryScanService service = new HistoryScanService(api, new ExtensionConfig());
         ScanBatch batch = service.collect(new ScanOptions(false, true, true, false,
-                true, List.of("/static/*")));
+                true, false, false, List.of("/static/*")));
 
         assertThat(batch.exchanges()).hasSize(1);
         assertThat(batch.summary().sourceRecords()).isEqualTo(4);

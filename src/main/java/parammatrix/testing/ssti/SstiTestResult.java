@@ -6,12 +6,13 @@ import parammatrix.model.DiscoveryConfidence;
 public record SstiTestResult(
         String parameter,
         SstiEngine templateEngine,
+        SstiTestStatus status,
         String payload,
         String expectedResult,
         String actualResult,
         String detectionMethod,
         DiscoveryConfidence confidence,
         String evidence,
-        HttpRequestResponse exchange) {
+        HttpRequestResponse originalExchange,
+        HttpRequestResponse testExchange) {
 }
-

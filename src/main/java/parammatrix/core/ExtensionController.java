@@ -3,6 +3,8 @@ package parammatrix.core;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.HttpRequestResponse;
 import parammatrix.config.ExtensionConfig;
+import parammatrix.config.SstiConfig;
+import parammatrix.config.DatabaseStressConfig;
 import parammatrix.discovery.ParameterDiscoveryEngine;
 import parammatrix.http.ExtensionRequestRegistry;
 import parammatrix.model.PageIdentity;
@@ -13,8 +15,17 @@ import parammatrix.scan.ScanOptions;
 import parammatrix.scan.ScanProgressListener;
 import parammatrix.storage.ResultRepository;
 import parammatrix.testing.TestCoordinator;
+import parammatrix.testing.ssti.SstiCoordinator;
+import parammatrix.testing.ssti.SstiProgressListener;
+import parammatrix.testing.ssti.SstiRunOptions;
+import parammatrix.testing.database.DatabaseProgressListener;
+import parammatrix.testing.database.DatabaseRunOptions;
+import parammatrix.testing.database.DatabaseTestCoordinator;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -29,6 +40,10 @@ public final class ExtensionController implements AutoCloseable {
     private final ResultRepository repository;
     private final ExtensionRequestRegistry generatedRequests;
     private final HistoryScanService historyScanService;
+    private final SstiCoordinator sstiCoordinator;
+    private final SstiConfig sstiConfig;
+    private final DatabaseTestCoordinator databaseCoordinator;
+    private final DatabaseStressConfig databaseConfig;
     private final ActiveTaskQueue queue;
     private final Set<PageIdentity> autoAnalyzed = ConcurrentHashMap.newKeySet();
 
@@ -36,7 +51,11 @@ public final class ExtensionController implements AutoCloseable {
                                ParameterDiscoveryEngine discovery, TestCoordinator testing,
                                ResultRepository repository,
                                ExtensionRequestRegistry generatedRequests,
-                               HistoryScanService historyScanService) {
+                               HistoryScanService historyScanService,
+                               SstiCoordinator sstiCoordinator,
+                               SstiConfig sstiConfig,
+                               DatabaseTestCoordinator databaseCoordinator,
+                               DatabaseStressConfig databaseConfig) {
         this.api = api;
         this.config = config;
         this.discovery = discovery;
@@ -44,6 +63,10 @@ public final class ExtensionController implements AutoCloseable {
         this.repository = repository;
         this.generatedRequests = generatedRequests;
         this.historyScanService = historyScanService;
+        this.sstiCoordinator = sstiCoordinator;
+        this.sstiConfig = sstiConfig;
+        this.databaseCoordinator = databaseCoordinator;
+        this.databaseConfig = databaseConfig;
         this.queue = new ActiveTaskQueue(config.concurrentActiveTests.get());
     }
 
@@ -77,7 +100,13 @@ public final class ExtensionController implements AutoCloseable {
                         ? Action.EXTRACT_AND_TEST : Action.EXTRACT;
                 for (HttpRequestResponse exchange : batch.exchanges()) {
                     queue.submit(() -> {
-                        execute(exchange, action);
+                        List<ParameterCandidate> candidates = execute(exchange, action);
+                        if (options.runSstiTests()) {
+                            sstiCoordinator.testPage(candidates, sstiConfig.snapshot());
+                        }
+                        if (options.runDatabaseTests()) {
+                            databaseCoordinator.testPage(candidates, databaseConfig.snapshot());
+                        }
                         int done = completed.incrementAndGet();
                         listener.itemCompleted(done, total);
                         if (done == total) listener.scanFinished(batch.summary());
@@ -91,7 +120,68 @@ public final class ExtensionController implements AutoCloseable {
         });
     }
 
-    private void execute(HttpRequestResponse exchange, Action action) {
+    public void submitSstiTest(SstiRunOptions options, SstiProgressListener listener) {
+        List<ParameterCandidate> candidates = repository.all().stream()
+                .filter(candidate -> !options.onlyReflectedParameters()
+                        || candidate.reflectionResult().status()
+                        == parammatrix.model.ReflectionStatus.REFLECTED)
+                .toList();
+        Map<PageIdentity, List<ParameterCandidate>> pages = new LinkedHashMap<>();
+        for (ParameterCandidate candidate : candidates) {
+            pages.computeIfAbsent(candidate.pageIdentity(), ignored -> new ArrayList<>()).add(candidate);
+        }
+        listener.started(pages.size(), candidates.size());
+        if (pages.isEmpty()) {
+            listener.finished(0);
+            return;
+        }
+        AtomicInteger completedPages = new AtomicInteger();
+        AtomicInteger resultCount = new AtomicInteger();
+        pages.values().forEach(page -> queue.submit(() -> {
+            try {
+                resultCount.addAndGet(sstiCoordinator.testPage(page, options).size());
+                int done = completedPages.incrementAndGet();
+                listener.pageCompleted(done, pages.size());
+                if (done == pages.size()) listener.finished(resultCount.get());
+            } catch (RuntimeException exception) {
+                api.logging().logToError("ParamMatrix SSTI test failed", exception);
+                listener.failed(exception.getClass().getSimpleName() + ": " + exception.getMessage());
+            }
+        }));
+    }
+
+    public void submitDatabaseTest(DatabaseRunOptions options,
+                                   DatabaseProgressListener listener) {
+        List<ParameterCandidate> candidates = repository.all().stream()
+                .filter(candidate -> !options.onlyReflectedParameters()
+                        || candidate.reflectionResult().status()
+                        == parammatrix.model.ReflectionStatus.REFLECTED)
+                .toList();
+        Map<PageIdentity, List<ParameterCandidate>> pages = new LinkedHashMap<>();
+        for (ParameterCandidate candidate : candidates) {
+            pages.computeIfAbsent(candidate.pageIdentity(), ignored -> new ArrayList<>()).add(candidate);
+        }
+        listener.started(pages.size(), candidates.size());
+        if (pages.isEmpty()) {
+            listener.finished(0);
+            return;
+        }
+        AtomicInteger completedPages = new AtomicInteger();
+        AtomicInteger resultCount = new AtomicInteger();
+        pages.values().forEach(page -> queue.submit(() -> {
+            try {
+                resultCount.addAndGet(databaseCoordinator.testPage(page, options).size());
+                int done = completedPages.incrementAndGet();
+                listener.pageCompleted(done, pages.size());
+                if (done == pages.size()) listener.finished(resultCount.get());
+            } catch (RuntimeException exception) {
+                api.logging().logToError("ParamMatrix database stress test failed", exception);
+                listener.failed(exception.getClass().getSimpleName() + ": " + exception.getMessage());
+            }
+        }));
+    }
+
+    private List<ParameterCandidate> execute(HttpRequestResponse exchange, Action action) {
         try {
             List<ParameterCandidate> candidates;
             if (action == Action.TEST) {
@@ -103,8 +193,10 @@ public final class ExtensionController implements AutoCloseable {
                 candidates = repository.saveAll(discovery.discover(exchange));
             }
             if (action != Action.EXTRACT) testing.testReflections(candidates);
+            return candidates;
         } catch (RuntimeException exception) {
             api.logging().logToError("ParamMatrix task failed", exception);
+            return List.of();
         }
     }
 

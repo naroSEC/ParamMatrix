@@ -16,6 +16,10 @@ page are never tested against another endpoint.
 - Retains every discovery source when the same parameter appears in more than one place
 - Tests reflections in batches, individually, or with individual verification of batch positives
 - Records the marker, response excerpt, test exchange, and estimated reflection context
+- Runs non-destructive, engine-specific SSTI arithmetic probes with exact evaluated-result matching
+- Keeps SSTI findings in a separate evidence-focused result view
+- Applies short database syntax stress strings and detects new DB/driver error signatures
+- Separates confirmed DB errors from low-confidence response behavior changes
 - Provides manual actions in Proxy history, Site map, and HTTP message editors
 - Scans existing Proxy History and Site Map/crawl records with method and path filters
 - Supports guarded automatic analysis of Proxy traffic
@@ -46,7 +50,7 @@ On Linux or macOS:
 The extension JAR is written to:
 
 ```text
-build/libs/param-matrix-1.1.0.jar
+build/libs/param-matrix-1.3.0.jar
 ```
 
 jsoup is bundled in the output JAR. The Montoya API is supplied by Burp and is therefore declared as
@@ -56,7 +60,7 @@ a compile-only dependency.
 
 1. Open **Extensions > Installed** in Burp Suite.
 2. Click **Add** and select **Java**.
-3. Choose `build/libs/param-matrix-1.1.0.jar`.
+3. Choose `build/libs/param-matrix-1.3.0.jar`.
 4. Confirm that the **Parameter Analyzer** tab appears.
 
 Automatic analysis is disabled on first load.
@@ -97,6 +101,12 @@ or both. GET and POST requests can be enabled independently. Other methods are s
 Choose **Discover only** to populate the result table without active traffic, or **Discover + reflection
 test** to run the configured reflection workflow for every eligible page. Records from both sources are
 deduplicated using the same page identity as automatic analysis.
+
+Enable **Include SSTI testing** to run the engines and target policy selected in the **SSTI Test** tab
+after discovery. The option is disabled by default.
+
+Enable **Include DB error testing** to apply the signature families and safety settings selected in
+the **DB Stress Test** tab. This option is also disabled by default.
 
 Excluded paths accept one rule per line:
 
@@ -187,13 +197,56 @@ src/main/java/
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for component responsibilities and data flow.
 
-## SSTI extension points
+## SSTI testing
 
-The current release does not send SSTI payloads. It includes interfaces and result models for adding
-engine-specific providers for Generic, Jinja2, Twig, FreeMarker, Velocity, Thymeleaf, and Smarty.
+The **SSTI Test** tab provides providers for Generic, Jinja2, Twig, FreeMarker, Velocity, Thymeleaf,
+and Smarty. Select one or more engines, choose whether to test all discovered parameters or reflected
+parameters only, set a per-page request budget and delay, then click **Start SSTI test**.
 
-SSTI testing is designed as a peer module to reflection testing. It can operate on all discovered
-parameters or only reflected parameters without making reflection a hard dependency.
+Each request uses randomized arithmetic operands inside an engine-specific expression. A unique prefix
+and suffix surround the expression. A result is marked **DETECTED** only when the response contains the
+same prefix and suffix around the calculated value; a literal reflection of the input payload does not
+count as detection.
+
+Results are stored in **SSTI Results** with:
+
+- Template engine/provider
+- Payload and expected evaluated value
+- Detection status and confidence
+- Original and test request/response
+- Response evidence surrounding the evaluated marker
+
+SSTI is a peer module to reflection testing and does not require a positive reflection result. Active
+SSTI requests use the same original-request preservation, Burp scope, generated-request filtering, and
+worker queue as reflection tests. Its delay and per-page request limit are configured separately.
+
+## Database error stress testing
+
+The **DB Stress Test** tab applies a small set of short syntax boundary strings—quotes, quote/parenthesis
+combinations, and a backslash—to discovered parameters one at a time. It does not send SQL statements,
+time-delay expressions, data access queries, or destructive payloads.
+
+Error signatures are available for:
+
+- MySQL and MariaDB
+- PostgreSQL
+- Microsoft SQL Server
+- Oracle
+- SQLite
+- IBM DB2
+- Generic JDBC, ODBC, SQLSTATE, and ORM exceptions
+
+The engine compares each test response to the original response. A result is classified as:
+
+- **DB_ERROR_DETECTED** when a selected DB/driver signature appears only in the test response
+- **BEHAVIOR_CHANGED** when the response becomes a server error or changes substantially without a
+  recognized DB signature
+- **NOT_DETECTED**, **ERROR**, or **SKIPPED** otherwise
+
+Recognized DB errors are repeated once by default and marked verified only when the same database
+signature family appears again. The **DB Error Results** tab stores status changes, body-length delta,
+signature, confidence, verification status, evidence, and both HTTP exchanges. DB testing has its own
+parameter policy, delay, and per-page request budget and does not depend on Reflection or SSTI results.
 
 ## Known limitations
 
@@ -202,6 +255,12 @@ parameters or only reflected parameters without making reflection a hard depende
 - JSON request injection supports top-level objects and does not replace existing JSON keys.
 - Multipart insertion depends on Montoya's multipart parameter handling for the captured message.
 - Reflection context classification is heuristic rather than browser-backed parsing.
+- Arithmetic evaluation confirms template expression execution but does not always fingerprint the
+  exact engine. Engines with overlapping syntax, notably Jinja2 and Twig, can produce equivalent hits.
+- SSTI testing intentionally excludes command execution, file access, environment access, and outbound
+  network payloads.
+- DB error signatures indicate error behavior, not proof that an injectable SQL statement can be
+  controlled. Behavior-only changes are intentionally reported with LOW confidence.
 - Settings are kept for the current extension session.
 - Automatic analysis observes Proxy responses; traffic from other Burp tools can be analyzed manually.
 
