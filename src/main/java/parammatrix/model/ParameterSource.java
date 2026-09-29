@@ -1,0 +1,17 @@
+package parammatrix.model;
+
+public enum ParameterSource {
+    HTML_INPUT,
+    HTML_SELECT,
+    HTML_TEXTAREA,
+    HTML_BUTTON,
+    HTML_URL,
+    JAVASCRIPT_FETCH,
+    JAVASCRIPT_AJAX,
+    JAVASCRIPT_FORMDATA,
+    JAVASCRIPT_URLSEARCHPARAMS,
+    JAVASCRIPT_LOCATION,
+    JAVASCRIPT_OBJECT,
+    OTHER
+}
+
