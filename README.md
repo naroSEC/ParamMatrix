@@ -51,7 +51,7 @@ On Linux or macOS:
 The extension JAR is written to:
 
 ```text
-build/libs/param-matrix-1.3.1.jar
+build/libs/param-matrix-1.3.2.jar
 ```
 
 jsoup is bundled in the output JAR. The Montoya API is supplied by Burp and is therefore declared as
@@ -61,7 +61,7 @@ a compile-only dependency.
 
 1. Open **Extensions > Installed** in Burp Suite.
 2. Click **Add** and select **Java**.
-3. Choose `build/libs/param-matrix-1.3.1.jar`.
+3. Choose `build/libs/param-matrix-1.3.2.jar`.
 4. Confirm that the **ParamMatrix** tab appears.
 
 Automatic analysis is disabled on first load.
@@ -125,6 +125,9 @@ Blank lines and lines beginning with `#` are ignored. The scan progress bar repo
 counts records skipped by method, path, or duplicate identity. Active requests continue to respect the
 scope, delay, concurrency, and per-page request budget configured in Settings.
 
+**Cancel current scan** stops that scan from starting additional page tests. Requests already in flight
+are allowed to finish. It does not cancel unrelated manual, SSTI, DB, or Auto Analysis work.
+
 ## Reflection testing
 
 Each candidate receives an independent marker in the following form:
@@ -166,6 +169,11 @@ Active testing can be limited with:
 
 Parsing and HTTP requests run on worker threads. Swing components are updated on the Event Dispatch
 Thread.
+
+The global **Activity** bar remains visible below every ParamMatrix tab. **Pause Queue** delays queued
+work without interrupting active requests, while **Clear Queued Tasks** discards work that has not
+started. Clearing queued Scan work also updates the Scan view to a cancelled state. Operational queue
+controls are intentionally separate from the Settings page.
 
 ## Discovery behavior
 

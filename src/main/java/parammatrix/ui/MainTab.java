@@ -51,8 +51,9 @@ public final class MainTab extends JPanel {
         tabs.addTab("SSTI Test", new JScrollPane(new SstiSettingsPanel(controller, sstiConfig)));
         tabs.addTab("DB Stress Test", new JScrollPane(
                 new DatabaseStressPanel(controller, databaseConfig)));
-        tabs.addTab("Settings", new JScrollPane(new SettingsPanel(config, controller.queue())));
+        tabs.addTab("Settings", new JScrollPane(new SettingsPanel(config)));
         add(tabs, BorderLayout.CENTER);
+        add(new GlobalQueueBar(controller.queue()), BorderLayout.SOUTH);
 
         repository.addListener(() -> SwingUtilities.invokeLater(() -> {
             model.setRows(repository.all());

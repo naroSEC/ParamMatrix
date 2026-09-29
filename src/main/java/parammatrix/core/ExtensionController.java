@@ -13,6 +13,7 @@ import parammatrix.scan.HistoryScanService;
 import parammatrix.scan.ScanBatch;
 import parammatrix.scan.ScanOptions;
 import parammatrix.scan.ScanProgressListener;
+import parammatrix.scan.ScanSummary;
 import parammatrix.storage.ResultRepository;
 import parammatrix.testing.TestCoordinator;
 import parammatrix.testing.ssti.SstiCoordinator;
@@ -29,6 +30,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class ExtensionController implements AutoCloseable {
     public enum Action { EXTRACT, TEST, EXTRACT_AND_TEST }
@@ -46,6 +49,7 @@ public final class ExtensionController implements AutoCloseable {
     private final DatabaseStressConfig databaseConfig;
     private final ActiveTaskQueue queue;
     private final Set<PageIdentity> autoAnalyzed = ConcurrentHashMap.newKeySet();
+    private final AtomicReference<HistoryScanRun> activeHistoryScan = new AtomicReference<>();
 
     public ExtensionController(MontoyaApi api, ExtensionConfig config,
                                ParameterDiscoveryEngine discovery, TestCoordinator testing,
@@ -85,14 +89,21 @@ public final class ExtensionController implements AutoCloseable {
     }
 
     public void submitHistoryScan(ScanOptions options, ScanProgressListener listener) {
+        HistoryScanRun run = new HistoryScanRun(listener);
+        if (!activeHistoryScan.compareAndSet(null, run)) {
+            listener.scanFailed("A history scan is already running");
+            return;
+        }
         queue.submit(() -> {
             try {
+                if (run.cancelled()) return;
                 listener.collectionStarted();
                 ScanBatch batch = historyScanService.collect(options);
+                if (run.cancelled()) return;
                 listener.scanStarted(batch.summary());
                 int total = batch.exchanges().size();
                 if (total == 0) {
-                    listener.scanFinished(batch.summary());
+                    run.finish(batch.summary());
                     return;
                 }
                 AtomicInteger completed = new AtomicInteger();
@@ -100,24 +111,30 @@ public final class ExtensionController implements AutoCloseable {
                         ? Action.EXTRACT_AND_TEST : Action.EXTRACT;
                 for (HttpRequestResponse exchange : batch.exchanges()) {
                     queue.submit(() -> {
+                        if (run.cancelled()) return;
                         List<ParameterCandidate> candidates = execute(exchange, action);
-                        if (options.runSstiTests()) {
+                        if (!run.cancelled() && options.runSstiTests()) {
                             sstiCoordinator.testPage(candidates, sstiConfig.snapshot());
                         }
-                        if (options.runDatabaseTests()) {
+                        if (!run.cancelled() && options.runDatabaseTests()) {
                             databaseCoordinator.testPage(candidates, databaseConfig.snapshot());
                         }
+                        if (run.cancelled()) return;
                         int done = completed.incrementAndGet();
                         listener.itemCompleted(done, total);
-                        if (done == total) listener.scanFinished(batch.summary());
-                    });
+                        if (done == total) run.finish(batch.summary());
+                    }, run::cancel);
                 }
             } catch (RuntimeException exception) {
                 api.logging().logToError("ParamMatrix history scan failed", exception);
-                listener.scanFailed(exception.getClass().getSimpleName() + ": "
-                        + exception.getMessage());
+                run.fail(exception.getClass().getSimpleName() + ": " + exception.getMessage());
             }
-        });
+        }, run::cancel);
+    }
+
+    public boolean cancelHistoryScan() {
+        HistoryScanRun run = activeHistoryScan.get();
+        return run != null && run.cancel();
     }
 
     public void submitSstiTest(SstiRunOptions options, SstiProgressListener listener) {
@@ -202,4 +219,38 @@ public final class ExtensionController implements AutoCloseable {
 
     public ActiveTaskQueue queue() { return queue; }
     @Override public void close() { queue.close(); }
+
+    private final class HistoryScanRun {
+        private final ScanProgressListener listener;
+        private final AtomicBoolean cancelled = new AtomicBoolean(false);
+        private final AtomicBoolean terminal = new AtomicBoolean(false);
+
+        private HistoryScanRun(ScanProgressListener listener) {
+            this.listener = listener;
+        }
+
+        private boolean cancelled() {
+            return cancelled.get();
+        }
+
+        private boolean cancel() {
+            if (terminal.get() || !cancelled.compareAndSet(false, true)) return false;
+            if (!terminal.compareAndSet(false, true)) return false;
+            listener.scanCancelled();
+            activeHistoryScan.compareAndSet(this, null);
+            return true;
+        }
+
+        private void finish(ScanSummary summary) {
+            if (cancelled.get() || !terminal.compareAndSet(false, true)) return;
+            activeHistoryScan.compareAndSet(this, null);
+            listener.scanFinished(summary);
+        }
+
+        private void fail(String message) {
+            if (cancelled.get() || !terminal.compareAndSet(false, true)) return;
+            activeHistoryScan.compareAndSet(this, null);
+            listener.scanFailed(message);
+        }
+    }
 }

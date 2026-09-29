@@ -44,6 +44,7 @@ public final class HistoryScanPanel extends JPanel {
     private final JCheckBox includeDatabase = new JCheckBox("Include DB error testing", false);
     private final JTextArea exclusions = new JTextArea(8, 42);
     private final JButton start = new JButton("Start history scan");
+    private final JButton cancel = new JButton("Cancel current scan");
     private final JProgressBar progress = new JProgressBar();
     private final JLabel status = new JLabel("Ready");
     private final JLabel summary = new JLabel(" ");
@@ -59,6 +60,8 @@ public final class HistoryScanPanel extends JPanel {
         add(content(), BorderLayout.CENTER);
         add(footer(), BorderLayout.SOUTH);
         start.addActionListener(ignored -> startScan());
+        cancel.setEnabled(false);
+        cancel.addActionListener(ignored -> cancelScan());
     }
 
     private JPanel header() {
@@ -156,9 +159,13 @@ public final class HistoryScanPanel extends JPanel {
         panel.add(Box.createVerticalStrut(10));
         JPanel actionRow = new JPanel(new BorderLayout(12, 0));
         start.setPreferredSize(new Dimension(180, 38));
+        cancel.setPreferredSize(new Dimension(180, 38));
         progress.setStringPainted(true);
         progress.setString("Ready");
-        actionRow.add(start, BorderLayout.WEST);
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        buttons.add(start);
+        buttons.add(cancel);
+        actionRow.add(buttons, BorderLayout.WEST);
         actionRow.add(progress, BorderLayout.CENTER);
         panel.add(actionRow);
         panel.add(Box.createVerticalStrut(7));
@@ -193,34 +200,43 @@ public final class HistoryScanPanel extends JPanel {
         ScanOptions options = new ScanOptions(proxyHistory.isSelected(), siteMap.isSelected(),
                 get.isSelected(), post.isSelected(), discoverAndTest.isSelected(),
                 includeSsti.isSelected(), includeDatabase.isSelected(), rules);
-        start.setEnabled(false);
-        progress.setIndeterminate(true);
-        progress.setString("Collecting traffic...");
-        status.setText("Reading Burp history");
         if (includeSsti.isSelected() && sstiConfig.selectedEngines().isEmpty()) {
             showValidation("Select at least one engine in SSTI Test.");
-            start.setEnabled(true);
             return;
         }
         if (includeSsti.isSelected() && sstiConfig.onlyReflectedParameters.get()
                 && discoverOnly.isSelected()) {
             showValidation("Reflected-only SSTI requires Discover + reflection test.");
-            start.setEnabled(true);
             return;
         }
         if (includeDatabase.isSelected() && databaseConfig.selectedDatabases().isEmpty()) {
             showValidation("Select at least one signature family in DB Stress Test.");
-            start.setEnabled(true);
             return;
         }
         if (includeDatabase.isSelected() && databaseConfig.onlyReflectedParameters.get()
                 && discoverOnly.isSelected()) {
             showValidation("Reflected-only DB testing requires Discover + reflection test.");
-            start.setEnabled(true);
             return;
         }
+        setScanRunning(true);
+        progress.setIndeterminate(true);
+        progress.setString("Collecting traffic...");
+        status.setText("Reading Burp history");
         summary.setText(" ");
         controller.submitHistoryScan(options, new UiProgress());
+    }
+
+    private void cancelScan() {
+        if (controller.cancelHistoryScan()) {
+            cancel.setEnabled(false);
+            status.setText("Cancelling after the current page...");
+            progress.setString("Cancelling...");
+        }
+    }
+
+    private void setScanRunning(boolean running) {
+        start.setEnabled(!running);
+        cancel.setEnabled(running);
     }
 
     private void addCommonExclusions() {
@@ -273,7 +289,16 @@ public final class HistoryScanPanel extends JPanel {
                 progress.setString("Complete");
                 status.setText("History scan complete");
                 summary.setText(summaryText(value));
-                start.setEnabled(true);
+                setScanRunning(false);
+            });
+        }
+
+        @Override public void scanCancelled() {
+            onEdt(() -> {
+                progress.setIndeterminate(false);
+                progress.setString("Cancelled");
+                status.setText("History scan cancelled; active request allowed to finish");
+                setScanRunning(false);
             });
         }
 
@@ -282,7 +307,7 @@ public final class HistoryScanPanel extends JPanel {
                 progress.setIndeterminate(false);
                 progress.setString("Failed");
                 status.setText(message);
-                start.setEnabled(true);
+                setScanRunning(false);
             });
         }
 
