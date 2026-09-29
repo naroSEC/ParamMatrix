@@ -7,12 +7,17 @@ import parammatrix.discovery.ParameterDiscoveryEngine;
 import parammatrix.http.ExtensionRequestRegistry;
 import parammatrix.model.PageIdentity;
 import parammatrix.model.ParameterCandidate;
+import parammatrix.scan.HistoryScanService;
+import parammatrix.scan.ScanBatch;
+import parammatrix.scan.ScanOptions;
+import parammatrix.scan.ScanProgressListener;
 import parammatrix.storage.ResultRepository;
 import parammatrix.testing.TestCoordinator;
 
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class ExtensionController implements AutoCloseable {
     public enum Action { EXTRACT, TEST, EXTRACT_AND_TEST }
@@ -23,19 +28,22 @@ public final class ExtensionController implements AutoCloseable {
     private final TestCoordinator testing;
     private final ResultRepository repository;
     private final ExtensionRequestRegistry generatedRequests;
+    private final HistoryScanService historyScanService;
     private final ActiveTaskQueue queue;
     private final Set<PageIdentity> autoAnalyzed = ConcurrentHashMap.newKeySet();
 
     public ExtensionController(MontoyaApi api, ExtensionConfig config,
                                ParameterDiscoveryEngine discovery, TestCoordinator testing,
                                ResultRepository repository,
-                               ExtensionRequestRegistry generatedRequests) {
+                               ExtensionRequestRegistry generatedRequests,
+                               HistoryScanService historyScanService) {
         this.api = api;
         this.config = config;
         this.discovery = discovery;
         this.testing = testing;
         this.repository = repository;
         this.generatedRequests = generatedRequests;
+        this.historyScanService = historyScanService;
         this.queue = new ActiveTaskQueue(config.concurrentActiveTests.get());
     }
 
@@ -51,6 +59,36 @@ public final class ExtensionController implements AutoCloseable {
         if (!autoAnalyzed.add(identity)) return;
         queue.submit(() -> execute(exchange, config.reflectionEnabled.get()
                 ? Action.EXTRACT_AND_TEST : Action.EXTRACT));
+    }
+
+    public void submitHistoryScan(ScanOptions options, ScanProgressListener listener) {
+        queue.submit(() -> {
+            try {
+                listener.collectionStarted();
+                ScanBatch batch = historyScanService.collect(options);
+                listener.scanStarted(batch.summary());
+                int total = batch.exchanges().size();
+                if (total == 0) {
+                    listener.scanFinished(batch.summary());
+                    return;
+                }
+                AtomicInteger completed = new AtomicInteger();
+                Action action = options.runReflectionTests()
+                        ? Action.EXTRACT_AND_TEST : Action.EXTRACT;
+                for (HttpRequestResponse exchange : batch.exchanges()) {
+                    queue.submit(() -> {
+                        execute(exchange, action);
+                        int done = completed.incrementAndGet();
+                        listener.itemCompleted(done, total);
+                        if (done == total) listener.scanFinished(batch.summary());
+                    });
+                }
+            } catch (RuntimeException exception) {
+                api.logging().logToError("ParamMatrix history scan failed", exception);
+                listener.scanFailed(exception.getClass().getSimpleName() + ": "
+                        + exception.getMessage());
+            }
+        });
     }
 
     private void execute(HttpRequestResponse exchange, Action action) {

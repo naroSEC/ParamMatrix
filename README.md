@@ -17,6 +17,7 @@ page are never tested against another endpoint.
 - Tests reflections in batches, individually, or with individual verification of batch positives
 - Records the marker, response excerpt, test exchange, and estimated reflection context
 - Provides manual actions in Proxy history, Site map, and HTTP message editors
+- Scans existing Proxy History and Site Map/crawl records with method and path filters
 - Supports guarded automatic analysis of Proxy traffic
 - Uses Burp message editors for original and test request/response inspection
 
@@ -45,7 +46,7 @@ On Linux or macOS:
 The extension JAR is written to:
 
 ```text
-build/libs/param-matrix-1.0.0.jar
+build/libs/param-matrix-1.1.0.jar
 ```
 
 jsoup is bundled in the output JAR. The Montoya API is supplied by Burp and is therefore declared as
@@ -55,7 +56,7 @@ a compile-only dependency.
 
 1. Open **Extensions > Installed** in Burp Suite.
 2. Click **Add** and select **Java**.
-3. Choose `build/libs/param-matrix-1.0.0.jar`.
+3. Choose `build/libs/param-matrix-1.1.0.jar`.
 4. Confirm that the **Parameter Analyzer** tab appears.
 
 Automatic analysis is disabled on first load.
@@ -87,6 +88,27 @@ response classification
 A page identity is derived from protocol, host, port, method, path, and request parameter structure.
 Parameter values are ignored by default, so revisiting the same endpoint with different values does
 not repeatedly trigger active tests. This behavior can be changed in Settings.
+
+## History scan
+
+The **Scan** tab can collect previously recorded traffic from **Proxy History**, **Site Map / Crawl**,
+or both. GET and POST requests can be enabled independently. Other methods are skipped.
+
+Choose **Discover only** to populate the result table without active traffic, or **Discover + reflection
+test** to run the configured reflection workflow for every eligible page. Records from both sources are
+deduplicated using the same page identity as automatic analysis.
+
+Excluded paths accept one rule per line:
+
+```text
+/logout                  # exact path and descendants
+/static/*                # glob pattern
+regex:^/api/v[0-9]+/health$  # regular expression
+```
+
+Blank lines and lines beginning with `#` are ignored. The scan progress bar reports eligible pages and
+counts records skipped by method, path, or duplicate identity. Active requests continue to respect the
+scope, delay, concurrency, and per-page request budget configured in Settings.
 
 ## Reflection testing
 

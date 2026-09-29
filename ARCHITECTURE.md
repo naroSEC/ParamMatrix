@@ -14,6 +14,7 @@
 
 - `burp` — the single Montoya entry point and registration/composition root.
 - `core` — workflow orchestration, Proxy auto-analyzer, context menu and bounded/pausable worker queue.
+- `scan` — Proxy History/Site Map collection, GET/POST filtering, exclusion rules and scan progress.
 - `config` — thread-safe runtime settings.
 - `discovery` — response classification, jsoup-based HTML extraction, replaceable JavaScript parser and
   evidence aggregation.
@@ -55,6 +56,10 @@ Proxy response or context-menu selection
    marker/context/evidence result -> repository -> Swing EDT
 ```
 
+The History Scan entry point first merges Proxy History and Site Map/crawl records, applies method and
+path exclusions, and deduplicates them by `PageIdentity`. Eligible exchanges then enter the same
+controller and worker queue as manual analysis, preserving page isolation and all active-test limits.
+
 ## Page isolation and duplicate policy
 
 `PageIdentity` is scheme + host + port + method + path + sorted request parameter structure. By default,
@@ -76,4 +81,3 @@ pending-queue clear and generated-request fingerprints are independent controls.
 SSTI is a peer testing module, not a subclass of reflection. `SstiTestEngine` accepts any candidate and
 a selected engine set. `SstiPayloadProvider` is engine-specific. A future policy layer may pass every
 candidate or only reflected candidates, but the engine interface itself has no reflection dependency.
-

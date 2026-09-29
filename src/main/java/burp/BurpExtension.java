@@ -15,6 +15,7 @@ import parammatrix.http.MarkerGenerator;
 import parammatrix.http.RequestMutator;
 import parammatrix.http.RequestSender;
 import parammatrix.http.SimpleJsonRequestInjector;
+import parammatrix.scan.HistoryScanService;
 import parammatrix.storage.ResultRepository;
 import parammatrix.testing.ReflectionTestEngine;
 import parammatrix.testing.TestCoordinator;
@@ -40,7 +41,7 @@ public final class BurpExtension implements burp.api.montoya.BurpExtension {
                 new RequestSender(api, generatedRequests), new ReflectionContextAnalyzer());
         TestCoordinator testing = new TestCoordinator(reflection, config, repository);
         ExtensionController controller = new ExtensionController(api, config, discovery,
-                testing, repository, generatedRequests);
+                testing, repository, generatedRequests, new HistoryScanService(api, config));
 
         MainTab mainTab = createUi(api, repository, config, controller);
         api.userInterface().registerSuiteTab("Parameter Analyzer", mainTab);
@@ -54,12 +55,12 @@ public final class BurpExtension implements burp.api.montoya.BurpExtension {
     private MainTab createUi(MontoyaApi api, ResultRepository repository,
                              ExtensionConfig config, ExtensionController controller) {
         if (SwingUtilities.isEventDispatchThread()) {
-            return new MainTab(api, repository, config, controller.queue());
+            return new MainTab(api, repository, config, controller);
         }
         AtomicReference<MainTab> result = new AtomicReference<>();
         try {
             SwingUtilities.invokeAndWait(() -> result.set(
-                    new MainTab(api, repository, config, controller.queue())));
+                    new MainTab(api, repository, config, controller)));
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while creating ParamMatrix UI", exception);
@@ -69,4 +70,3 @@ public final class BurpExtension implements burp.api.montoya.BurpExtension {
         return result.get();
     }
 }
-

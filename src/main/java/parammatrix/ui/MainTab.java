@@ -2,7 +2,7 @@ package parammatrix.ui;
 
 import burp.api.montoya.MontoyaApi;
 import parammatrix.config.ExtensionConfig;
-import parammatrix.core.ActiveTaskQueue;
+import parammatrix.core.ExtensionController;
 import parammatrix.model.ParameterCandidate;
 import parammatrix.storage.ResultRepository;
 
@@ -21,7 +21,7 @@ public final class MainTab extends JPanel {
     private final JTable table = new JTable(model);
 
     public MainTab(MontoyaApi api, ResultRepository repository,
-                   ExtensionConfig config, ActiveTaskQueue queue) {
+                   ExtensionConfig config, ExtensionController controller) {
         super(new BorderLayout());
         ResultDetailPanel details = new ResultDetailPanel(api);
         table.setAutoCreateRowSorter(true);
@@ -39,8 +39,9 @@ public final class MainTab extends JPanel {
         split.setResizeWeight(0.48);
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Results", split);
-        tabs.addTab("Settings", new JScrollPane(new SettingsPanel(config, queue)));
-        tabs.addTab("SSTI (Future)", new SstiSettingsPanel());
+        tabs.addTab("Scan", new HistoryScanPanel(controller));
+        tabs.addTab("Settings", new JScrollPane(new SettingsPanel(config, controller.queue())));
+        tabs.addTab("SSTI", new JScrollPane(new SstiSettingsPanel()));
         add(tabs, BorderLayout.CENTER);
 
         repository.addListener(() -> SwingUtilities.invokeLater(() -> {
