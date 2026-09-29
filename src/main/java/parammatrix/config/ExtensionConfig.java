@@ -21,7 +21,7 @@ public final class ExtensionConfig {
     public volatile ReflectionMode reflectionMode = ReflectionMode.BATCH_AND_VERIFY;
     public final AtomicInteger requestDelayMillis = new AtomicInteger(150);
     public final AtomicInteger maximumRequestsPerPage = new AtomicInteger(20);
-    public final AtomicInteger concurrentActiveTests = new AtomicInteger(3);
+    public final AtomicInteger concurrentActiveTests = new AtomicInteger(5);
 
     public final AtomicBoolean htmlFormFields = new AtomicBoolean(true);
     public final AtomicBoolean htmlUrls = new AtomicBoolean(true);

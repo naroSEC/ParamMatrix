@@ -51,7 +51,7 @@ On Linux or macOS:
 The extension JAR is written to:
 
 ```text
-build/libs/param-matrix-1.3.2.jar
+build/libs/param-matrix-1.3.3.jar
 ```
 
 jsoup is bundled in the output JAR. The Montoya API is supplied by Burp and is therefore declared as
@@ -61,7 +61,7 @@ a compile-only dependency.
 
 1. Open **Extensions > Installed** in Burp Suite.
 2. Click **Add** and select **Java**.
-3. Choose `build/libs/param-matrix-1.3.2.jar`.
+3. Choose `build/libs/param-matrix-1.3.3.jar`.
 4. Confirm that the **ParamMatrix** tab appears.
 
 Automatic analysis is disabled on first load.
