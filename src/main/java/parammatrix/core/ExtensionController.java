@@ -98,7 +98,7 @@ public final class ExtensionController implements AutoCloseable {
             try {
                 if (run.cancelled()) return;
                 listener.collectionStarted();
-                ScanBatch batch = historyScanService.collect(options, listener);
+                ScanBatch batch = historyScanService.collect(options, listener, run::cancelled);
                 if (run.cancelled()) return;
                 listener.scanStarted(batch.summary());
                 int total = batch.exchanges().size();
@@ -134,6 +134,11 @@ public final class ExtensionController implements AutoCloseable {
                         if (done == total) run.finish(batch.summary());
                     }, run::cancel);
                 }
+            } catch (OutOfMemoryError error) {
+                api.logging().logToError(
+                        "ParamMatrix history scan stopped due to Java heap exhaustion");
+                run.fail("History scan stopped: Java heap exhausted while Burp loaded a response. "
+                        + "Reduce Maximum pages or Maximum response size and retry.");
             } catch (RuntimeException exception) {
                 api.logging().logToError("ParamMatrix history scan failed", exception);
                 run.fail(exception.getClass().getSimpleName() + ": " + exception.getMessage());

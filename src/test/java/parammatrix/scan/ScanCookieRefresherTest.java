@@ -1,11 +1,8 @@
 package parammatrix.scan;
 
-import burp.api.montoya.core.Annotations;
 import burp.api.montoya.http.HttpService;
 import burp.api.montoya.http.message.Cookie;
-import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.http.message.requests.HttpRequest;
-import burp.api.montoya.http.message.responses.HttpResponse;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZonedDateTime;
@@ -25,10 +22,8 @@ class ScanCookieRefresherTest {
         HttpRequest changed = mock(HttpRequest.class);
         when(request.withUpdatedHeader("Cookie", "scoped=two; session=fresh"))
                 .thenReturn(changed);
-        HttpRequestResponse exchange = exchange(request);
-
         ScanCookieRefresher.RefreshResult result = new ScanCookieRefresher().refresh(
-                exchange,
+                request,
                 List.of(cookie("session", "fresh", "example.test", "/", Optional.empty()),
                         cookie("scoped", "two", "example.test", "/account", Optional.empty()),
                         cookie("other", "no", "other.test", "/", Optional.empty()),
@@ -44,10 +39,8 @@ class ScanCookieRefresherTest {
     @Test
     void preservesOriginalExchangeWhenNoCookieMatches() {
         HttpRequest request = request("example.test", "/private", false);
-        HttpRequestResponse exchange = exchange(request);
-
         ScanCookieRefresher.RefreshResult result = new ScanCookieRefresher().refresh(
-                exchange,
+                request,
                 List.of(cookie("session", "foreign", "other.test", "/", Optional.empty())),
                 ZonedDateTime.now());
 
@@ -62,7 +55,7 @@ class ScanCookieRefresherTest {
         when(request.withAddedHeader("Cookie", "session=fresh")).thenReturn(changed);
 
         ScanCookieRefresher.RefreshResult result = new ScanCookieRefresher().refresh(
-                exchange(request),
+                request,
                 List.of(cookie("session", "fresh", ".example.test", "/", Optional.empty())),
                 ZonedDateTime.now());
 
@@ -78,7 +71,7 @@ class ScanCookieRefresherTest {
                 .thenReturn(changed);
 
         ScanCookieRefresher.RefreshResult result = new ScanCookieRefresher()
-                .replaceWithCustom(exchange(request), "app.example.test",
+                .replaceWithCustom(request, "app.example.test",
                         "Cookie: session=manual; role=admin");
 
         assertThat(result.refreshed()).isTrue();
@@ -91,7 +84,7 @@ class ScanCookieRefresherTest {
         HttpRequest request = request("other.example.test", "/", true);
 
         ScanCookieRefresher.RefreshResult result = new ScanCookieRefresher()
-                .replaceWithCustom(exchange(request), "app.example.test", "session=manual");
+                .replaceWithCustom(request, "app.example.test", "session=manual");
 
         assertThat(result.refreshed()).isFalse();
         assertThat(result.request()).isSameAs(request);
@@ -105,14 +98,6 @@ class ScanCookieRefresherTest {
         when(request.hasHeader("Cookie")).thenReturn(hasCookie);
         when(service.host()).thenReturn(host);
         return request;
-    }
-
-    private HttpRequestResponse exchange(HttpRequest request) {
-        HttpRequestResponse exchange = mock(HttpRequestResponse.class);
-        when(exchange.request()).thenReturn(request);
-        when(exchange.response()).thenReturn(mock(HttpResponse.class));
-        when(exchange.annotations()).thenReturn(mock(Annotations.class));
-        return exchange;
     }
 
     private Cookie cookie(String name, String value, String domain, String path,

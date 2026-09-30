@@ -7,6 +7,8 @@ public record ScanSummary(
         int excludedByPath,
         int duplicates,
         int withoutResponse,
-        int cookieHeadersUpdated) {
+        int cookieHeadersUpdated,
+        int oversizedResponses,
+        int skippedByPageLimit) {
 }
 

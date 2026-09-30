@@ -21,9 +21,11 @@ import javax.swing.JProgressBar;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
+import javax.swing.JSpinner;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
+import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import java.awt.BorderLayout;
@@ -41,6 +43,8 @@ public final class HistoryScanPanel extends JPanel {
     private final JCheckBox siteMap = new JCheckBox("Site Map / Crawl", true);
     private final JToggleButton get = new JToggleButton("GET", true);
     private final JToggleButton post = new JToggleButton("POST", true);
+    private final JSpinner maximumPages = new JSpinner(
+            new SpinnerNumberModel(500, 1, 10_000, 50));
     private final JRadioButton discoverOnly = new JRadioButton("Discover only");
     private final JRadioButton discoverAndTest = new JRadioButton("Discover + reflection test", true);
     private final JCheckBox includeSsti = new JCheckBox("Include SSTI testing", false);
@@ -113,6 +117,8 @@ public final class HistoryScanPanel extends JPanel {
         siteMap.setToolTipText("Requests and responses stored in Target Site Map, including crawl data");
         panel.add(proxyHistory);
         panel.add(siteMap);
+        panel.add(numberFieldRow("Maximum pages", maximumPages));
+        panel.add(new JLabel("Limits retained response objects per Scan run."));
         return panel;
     }
 
@@ -159,6 +165,15 @@ public final class HistoryScanPanel extends JPanel {
         row.setBorder(new EmptyBorder(2, 2, 2, 2));
         row.add(new JLabel(label), BorderLayout.WEST);
         row.add(field, BorderLayout.CENTER);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
+        return row;
+    }
+
+    private JPanel numberFieldRow(String label, JSpinner spinner) {
+        JPanel row = new JPanel(new BorderLayout(8, 0));
+        row.setBorder(new EmptyBorder(2, 2, 2, 2));
+        row.add(new JLabel(label), BorderLayout.WEST);
+        row.add(spinner, BorderLayout.EAST);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
         return row;
     }
@@ -290,7 +305,8 @@ public final class HistoryScanPanel extends JPanel {
         ScanOptions options = new ScanOptions(proxyHistory.isSelected(), siteMap.isSelected(),
                 get.isSelected(), post.isSelected(), discoverAndTest.isSelected(),
                 includeSsti.isSelected(), includeDatabase.isSelected(), cookieMode,
-                customCookieHost.getText(), customCookieHeader.getText(), rules);
+                customCookieHost.getText(), customCookieHeader.getText(),
+                (Integer) maximumPages.getValue(), rules);
         setScanRunning(true);
         progress.setIndeterminate(true);
         progress.setString("Collecting traffic...");
@@ -423,6 +439,8 @@ public final class HistoryScanPanel extends JPanel {
                     + "  |  Path: " + value.excludedByPath()
                     + "  |  Duplicates: " + value.duplicates()
                     + "  |  No response: " + value.withoutResponse()
+                    + "  |  Oversized: " + value.oversizedResponses()
+                    + "  |  Page limit: " + value.skippedByPageLimit()
                     + "  |  Cookie headers updated: " + value.cookieHeadersUpdated();
         }
 

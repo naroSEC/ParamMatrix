@@ -63,6 +63,9 @@ path exclusions, and deduplicates them by `PageIdentity`. Eligible exchanges the
 controller and worker queue as manual analysis, preserving page isolation and all active-test limits.
 `ScanCollectionProgress` events report source loading, record reading, filtering, Cookie updates, and
 page-test stages without sending Swing work to worker threads directly.
+Collection is single-pass per Burp source: method, path, duplicate identity, cancellation, and the
+per-Scan page cap are evaluated before response materialization. Accepted responses are size-checked
+and copied to Montoya temporary files instead of being accumulated in a second in-memory source list.
 For each Scan run, `ScanCookieRefresher` can retain recorded cookies, replace only the test copy's
 Cookie header with unexpired Burp Cookie Jar values matching the request host and path, or apply a
 visible user-entered Cookie value to one exact host. Recorded Burp traffic remains unchanged, and

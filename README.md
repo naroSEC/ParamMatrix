@@ -51,7 +51,7 @@ On Linux or macOS:
 The extension JAR is written to:
 
 ```text
-build/libs/param-matrix-1.3.6.jar
+build/libs/param-matrix-1.3.7.jar
 ```
 
 jsoup is bundled in the output JAR. The Montoya API is supplied by Burp and is therefore declared as
@@ -61,7 +61,7 @@ a compile-only dependency.
 
 1. Open **Extensions > Installed** in Burp Suite.
 2. Click **Add** and select **Java**.
-3. Choose `build/libs/param-matrix-1.3.6.jar`.
+3. Choose `build/libs/param-matrix-1.3.7.jar`.
 4. Confirm that the **ParamMatrix** tab appears.
 
 Automatic analysis is disabled on first load.
@@ -144,6 +144,13 @@ Map/Crawl reading, filtering, Cookie updates, and completed test pages. During t
 the total is not yet available, so the UI shows the exact source currently being loaded. While pages
 are tested, the status line also identifies Discovery/Reflection, SSTI, or database testing and the
 current request URL.
+
+History collection filters the request method, excluded path, and duplicate page identity before it
+asks Burp to materialize the response. Only eligible, unique responses are retained, oversized
+responses are discarded immediately, and retained exchanges are copied to Montoya temporary files to
+reduce Java heap pressure. **Maximum pages** defaults to 500 and stops collection before more response
+objects are loaded; increase it only when Burp has sufficient heap. The summary reports oversized and
+page-limit skips. Cancelling a Scan is also checked during collection, not only during active tests.
 
 **Cancel current scan** stops that scan from starting additional page tests. Requests already in flight
 are allowed to finish. It does not cancel unrelated manual, SSTI, DB, or Auto Analysis work.

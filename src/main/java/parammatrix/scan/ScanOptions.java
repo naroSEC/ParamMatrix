@@ -13,6 +13,7 @@ public record ScanOptions(
         ScanCookieMode cookieMode,
         String customCookieHost,
         String customCookieHeader,
+        int maximumPages,
         List<String> excludedPathRules) {
 
     public ScanOptions {
@@ -27,6 +28,7 @@ public record ScanOptions(
             throw new IllegalArgumentException(
                     "Custom Cookie mode requires a target host and Cookie value");
         }
+        if (maximumPages < 1) throw new IllegalArgumentException("maximumPages");
         excludedPathRules = excludedPathRules == null ? List.of() : List.copyOf(excludedPathRules);
     }
 }

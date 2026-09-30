@@ -1,7 +1,6 @@
 package parammatrix.scan;
 
 import burp.api.montoya.http.message.Cookie;
-import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.http.message.requests.HttpRequest;
 
 import java.time.ZonedDateTime;
@@ -12,9 +11,8 @@ import java.util.Locale;
 import java.util.Map;
 
 final class ScanCookieRefresher {
-    RefreshResult refresh(HttpRequestResponse exchange, List<Cookie> cookies,
+    RefreshResult refresh(HttpRequest request, List<Cookie> cookies,
                           ZonedDateTime now) {
-        HttpRequest request = exchange.request();
         String host = request.httpService().host().toLowerCase(Locale.ROOT);
         String path = normalizePath(request.pathWithoutQuery());
         Map<String, String> matching = new LinkedHashMap<>();
@@ -35,9 +33,8 @@ final class ScanCookieRefresher {
         return new RefreshResult(refreshed, true);
     }
 
-    RefreshResult replaceWithCustom(HttpRequestResponse exchange, String targetHost,
+    RefreshResult replaceWithCustom(HttpRequest request, String targetHost,
                                     String customCookieHeader) {
-        HttpRequest request = exchange.request();
         if (!request.httpService().host().equalsIgnoreCase(targetHost)) {
             return new RefreshResult(request, false);
         }

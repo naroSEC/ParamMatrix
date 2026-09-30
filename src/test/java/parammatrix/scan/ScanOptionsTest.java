@@ -11,7 +11,7 @@ class ScanOptionsTest {
     void rejectsLineBreaksInCustomCookieHeader() {
         assertThatThrownBy(() -> new ScanOptions(true, false, true, true,
                 true, false, false, ScanCookieMode.CUSTOM_HEADER,
-                "example.test", "session=ok\r\nX-Injected: yes", List.of()))
+                "example.test", "session=ok\r\nX-Injected: yes", 500, List.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("single line");
     }
@@ -20,7 +20,7 @@ class ScanOptionsTest {
     void customModeRequiresHostAndCookieValue() {
         assertThatThrownBy(() -> new ScanOptions(true, false, true, true,
                 true, false, false, ScanCookieMode.CUSTOM_HEADER,
-                "", "session=value", List.of()))
+                "", "session=value", 500, List.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("target host");
     }
