@@ -9,6 +9,8 @@ public record DatabaseTestResult(
         DatabaseType suspectedDatabase,
         String payloadName,
         String payload,
+        String wirePayload,
+        String encodingDescription,
         String errorSignature,
         DiscoveryConfidence confidence,
         boolean verified,
@@ -21,8 +23,9 @@ public record DatabaseTestResult(
 
     public DatabaseTestResult withVerification(boolean confirmed, String verificationEvidence) {
         return new DatabaseTestResult(parameter, status, suspectedDatabase, payloadName, payload,
-                errorSignature, confirmed ? DiscoveryConfidence.HIGH : DiscoveryConfidence.MEDIUM,
-                confirmed, originalStatus, testStatus, responseLengthDelta,
+                wirePayload, encodingDescription, errorSignature,
+                confirmed ? DiscoveryConfidence.HIGH : DiscoveryConfidence.MEDIUM, confirmed,
+                originalStatus, testStatus, responseLengthDelta,
                 evidence + "\n\nVerification: " + verificationEvidence,
                 originalExchange, testExchange);
     }

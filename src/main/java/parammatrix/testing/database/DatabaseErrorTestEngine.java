@@ -1,14 +1,14 @@
 package parammatrix.testing.database;
 
 import burp.api.montoya.http.message.HttpRequestResponse;
-import burp.api.montoya.http.message.requests.HttpRequest;
 import parammatrix.analysis.DatabaseErrorSignatureAnalyzer;
+import parammatrix.http.PayloadEncodingMode;
+import parammatrix.http.PayloadMutation;
 import parammatrix.http.RequestMutator;
 import parammatrix.http.RequestSender;
 import parammatrix.model.DiscoveryConfidence;
 import parammatrix.model.ParameterCandidate;
 
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -26,17 +26,19 @@ public final class DatabaseErrorTestEngine {
 
     public DatabaseTestResult execute(HttpRequestResponse base, ParameterCandidate parameter,
                                       DatabaseStressPayload payload,
-                                      Set<DatabaseType> enabledDatabases) {
+                                      Set<DatabaseType> enabledDatabases,
+                                      PayloadEncodingMode encodingMode) {
+        PayloadMutation mutation = null;
         try {
             String baseline = base.hasResponse() ? base.response().bodyToString() : "";
             short originalStatus = base.hasResponse() ? base.response().statusCode() : 0;
-            HttpRequest request = requestMutator.inject(base.request(),
-                    Map.of(parameter.name(), payload.value()));
-            HttpRequestResponse exchange = sender.send(request);
+            mutation = requestMutator.injectPayload(base.request(), parameter.name(),
+                    payload.value(), encodingMode);
+            HttpRequestResponse exchange = sender.send(mutation.request());
             if (!exchange.hasResponse()) {
                 return result(parameter, payload, DatabaseTestStatus.ERROR, DatabaseType.GENERIC,
                         "", DiscoveryConfidence.LOW, false, originalStatus, (short) 0, 0,
-                        "No response received", base, exchange);
+                        "No response received", base, exchange, mutation);
             }
             String tested = exchange.response().bodyToString();
             short testStatus = exchange.response().statusCode();
@@ -47,26 +49,27 @@ public final class DatabaseErrorTestEngine {
                 DatabaseErrorMatch match = error.get();
                 return result(parameter, payload, DatabaseTestStatus.DB_ERROR_DETECTED,
                         match.database(), match.signature(), DiscoveryConfidence.MEDIUM, false,
-                        originalStatus, testStatus, lengthDelta, match.evidence(), base, exchange);
+                        originalStatus, testStatus, lengthDelta, match.evidence(), base, exchange,
+                        mutation);
             }
             if (behaviorChanged(originalStatus, testStatus, baseline.length(), tested.length())) {
                 return result(parameter, payload, DatabaseTestStatus.BEHAVIOR_CHANGED,
                         DatabaseType.GENERIC, "", DiscoveryConfidence.LOW, false,
                         originalStatus, testStatus, lengthDelta,
                         "Response behavior changed without a recognized database error signature",
-                        base, exchange);
+                        base, exchange, mutation);
             }
             return result(parameter, payload, DatabaseTestStatus.NOT_DETECTED,
                     DatabaseType.GENERIC, "", DiscoveryConfidence.LOW, false,
                     originalStatus, testStatus, lengthDelta,
                     "No new database error signature or significant response change was observed",
-                    base, exchange);
+                    base, exchange, mutation);
         } catch (RuntimeException exception) {
             return result(parameter, payload, DatabaseTestStatus.ERROR, DatabaseType.GENERIC,
                     "", DiscoveryConfidence.LOW, false,
                     base.hasResponse() ? base.response().statusCode() : 0,
                     (short) 0, 0, exception.getClass().getSimpleName() + ": "
-                            + exception.getMessage(), base, null);
+                            + exception.getMessage(), base, null, mutation);
         }
     }
 
@@ -83,9 +86,11 @@ public final class DatabaseErrorTestEngine {
                                       String signature, DiscoveryConfidence confidence,
                                       boolean verified, short originalStatus, short testStatus,
                                       int lengthDelta, String evidence, HttpRequestResponse original,
-                                      HttpRequestResponse test) {
+                                      HttpRequestResponse test, PayloadMutation mutation) {
         return new DatabaseTestResult(parameter.name(), status, database, payload.name(),
-                payload.value(), signature, confidence, verified, originalStatus, testStatus,
-                lengthDelta, evidence, original, test);
+                payload.value(), mutation == null ? "" : mutation.wireValue(),
+                mutation == null ? "Not applied" : mutation.encodingDescription(), signature,
+                confidence, verified, originalStatus, testStatus, lengthDelta, evidence, original,
+                test);
     }
 }

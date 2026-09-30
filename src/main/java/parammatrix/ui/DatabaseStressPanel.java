@@ -2,6 +2,7 @@ package parammatrix.ui;
 
 import parammatrix.config.DatabaseStressConfig;
 import parammatrix.core.ExtensionController;
+import parammatrix.http.PayloadEncodingMode;
 import parammatrix.testing.database.DatabaseProgressListener;
 import parammatrix.testing.database.DatabaseStressPayload;
 import parammatrix.testing.database.DatabaseType;
@@ -14,6 +15,7 @@ import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
+import javax.swing.JComboBox;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JRadioButton;
@@ -103,8 +105,8 @@ public final class DatabaseStressPanel extends JPanel {
                 .map(payload -> new Object[] {payload.name(), visible(payload.value()),
                         "Syntax boundary"})
                 .toArray(Object[][]::new);
-        return PayloadPreviewPanel.create("Payloads sent",
-                "These exact short strings are tested; no SQL statements or delay payloads are used.",
+        return PayloadPreviewPanel.create("Logical payloads",
+                "Auto mode encodes these values once for URL queries and form bodies.",
                 new String[] {"Name", "Payload", "Purpose"}, rows, 1);
     }
 
@@ -138,7 +140,7 @@ public final class DatabaseStressPanel extends JPanel {
     }
 
     private JPanel policyPanel() {
-        JPanel panel = new JPanel(new GridLayout(1, 3, 14, 0));
+        JPanel panel = new JPanel(new GridLayout(1, 4, 14, 0));
         panel.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createTitledBorder("Test policy"),
                 new EmptyBorder(10, 10, 10, 10)));
@@ -173,9 +175,21 @@ public final class DatabaseStressPanel extends JPanel {
                 1, 500, config.maximumRequestsPerPage::set));
         limits.add(spinnerRow("Delay (ms)", config.requestDelayMillis.get(),
                 0, 60_000, config.requestDelayMillis::set));
+
+        JPanel transport = new JPanel();
+        transport.setLayout(new BoxLayout(transport, BoxLayout.Y_AXIS));
+        transport.add(new JLabel("Payload transport"));
+        JComboBox<PayloadEncodingMode> encoding = new JComboBox<>(PayloadEncodingMode.values());
+        encoding.setSelectedItem(config.payloadEncodingMode());
+        encoding.addActionListener(ignored -> config.setPayloadEncodingMode(
+                (PayloadEncodingMode) encoding.getSelectedItem()));
+        transport.add(encoding);
+        transport.add(new JLabel("Auto: encode URL/form once"));
+        transport.add(new JLabel("JSON/multipart keep native format"));
         panel.add(targets);
         panel.add(verification);
         panel.add(limits);
+        panel.add(transport);
         return panel;
     }
 

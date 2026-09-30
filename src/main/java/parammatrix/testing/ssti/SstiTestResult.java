@@ -8,6 +8,8 @@ public record SstiTestResult(
         SstiEngine templateEngine,
         SstiTestStatus status,
         String payload,
+        String wirePayload,
+        String encodingDescription,
         String expectedResult,
         String actualResult,
         String detectionMethod,

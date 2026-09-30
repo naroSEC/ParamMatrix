@@ -48,14 +48,15 @@ public final class DatabaseTestCoordinator {
                 } else {
                     if (requests > 0) delay(options.requestDelayMillis());
                     result = testEngine.execute(candidate.originalExchange(), candidate, payload,
-                            options.databases());
+                            options.databases(), options.payloadEncodingMode());
                     requests++;
                     if (result.status() == DatabaseTestStatus.DB_ERROR_DETECTED
                             && options.verifyPositiveResults()
                             && requests < options.maximumRequestsPerPage()) {
                         delay(options.requestDelayMillis());
                         DatabaseTestResult confirmation = testEngine.execute(
-                                candidate.originalExchange(), candidate, payload, options.databases());
+                                candidate.originalExchange(), candidate, payload,
+                                options.databases(), options.payloadEncodingMode());
                         requests++;
                         boolean verified = confirmation.status()
                                 == DatabaseTestStatus.DB_ERROR_DETECTED
@@ -75,7 +76,7 @@ public final class DatabaseTestCoordinator {
         short originalStatus = candidate.originalExchange().hasResponse()
                 ? candidate.originalExchange().response().statusCode() : 0;
         return new DatabaseTestResult(candidate.name(), DatabaseTestStatus.SKIPPED,
-                DatabaseType.GENERIC, payload.name(), payload.value(), "",
+                DatabaseType.GENERIC, payload.name(), payload.value(), "", "Not applied", "",
                 DiscoveryConfidence.LOW, false, originalStatus, (short) 0, 0, reason,
                 candidate.originalExchange(), null);
     }

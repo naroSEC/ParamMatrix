@@ -18,6 +18,8 @@ page are never tested against another endpoint.
 - Records the marker, response excerpt, test exchange, and estimated reflection context
 - Runs non-destructive, engine-specific SSTI arithmetic probes with exact evaluated-result matching
 - Shows the SSTI payload patterns and exact database stress strings before a test is started
+- Encodes SSTI and database payloads once for URL queries and form bodies, with an optional raw mode
+- Records both the logical payload and its actual wire value in result details
 - Keeps SSTI findings in a separate evidence-focused result view
 - Applies short database syntax stress strings and detects new DB/driver error signatures
 - Separates confirmed DB errors from low-confidence response behavior changes
@@ -51,7 +53,7 @@ On Linux or macOS:
 The extension JAR is written to:
 
 ```text
-build/libs/param-matrix-1.3.7.jar
+build/libs/param-matrix-1.3.8.jar
 ```
 
 jsoup is bundled in the output JAR. The Montoya API is supplied by Burp and is therefore declared as
@@ -61,7 +63,7 @@ a compile-only dependency.
 
 1. Open **Extensions > Installed** in Burp Suite.
 2. Click **Add** and select **Java**.
-3. Choose `build/libs/param-matrix-1.3.7.jar`.
+3. Choose `build/libs/param-matrix-1.3.8.jar`.
 4. Confirm that the **ParamMatrix** tab appears.
 
 Automatic analysis is disabled on first load.
@@ -243,6 +245,12 @@ The **SSTI Test** tab provides providers for Generic, Jinja2, Twig, FreeMarker, 
 and Smarty. Select one or more engines, choose whether to test all discovered parameters or reflected
 parameters only, set a per-page request budget and delay, then click **Start SSTI test**.
 
+**Payload transport** defaults to **Auto (recommended)**. URL query and
+`application/x-www-form-urlencoded` values are UTF-8 percent-encoded exactly once before they are
+placed on the wire. JSON requests use JSON string escaping instead of URL encoding, while multipart
+fields retain their native value. Choose **Raw** only when the target expects literal delimiters in
+the request. The result detail view records the logical payload, wire value, and applied strategy.
+
 Each request uses randomized arithmetic operands inside an engine-specific expression. A unique prefix
 and suffix surround the expression. A result is marked **DETECTED** only when the response contains the
 same prefix and suffix around the calculated value; a literal reflection of the input payload does not
@@ -287,12 +295,16 @@ Recognized DB errors are repeated once by default and marked verified only when 
 signature family appears again. The **DB Error Results** tab stores status changes, body-length delta,
 signature, confidence, verification status, evidence, and both HTTP exchanges. DB testing has its own
 parameter policy, delay, and per-page request budget and does not depend on Reflection or SSTI results.
+The DB test has the same independent **Auto (recommended)** and **Raw** payload transport setting as
+SSTI, and its result detail view shows the logical and wire forms of every stress string.
 
 ## Known limitations
 
 - Only inline JavaScript is analyzed; external scripts are not fetched.
 - Computed, obfuscated, or deeply nested JavaScript may not be recognized by the current parser.
 - JSON request injection supports top-level objects and does not replace existing JSON keys.
+- Auto encoding follows standard UTF-8 form encoding. Targets with unusual multi-stage decoding may
+  require Raw mode or manual confirmation in the recorded test request.
 - Multipart insertion depends on Montoya's multipart parameter handling for the captured message.
 - Reflection context classification is heuristic rather than browser-backed parsing.
 - Arithmetic evaluation confirms template expression execution but does not always fingerprint the

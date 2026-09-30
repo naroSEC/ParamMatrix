@@ -3,6 +3,7 @@ package parammatrix.testing.database;
 import burp.api.montoya.http.message.HttpRequestResponse;
 import org.junit.jupiter.api.Test;
 import parammatrix.config.ExtensionConfig;
+import parammatrix.http.PayloadEncodingMode;
 import parammatrix.model.DiscoveryConfidence;
 import parammatrix.model.ParameterCandidate;
 import parammatrix.storage.DatabaseResultRepository;
@@ -28,9 +29,11 @@ class DatabaseTestCoordinatorTest {
         when(candidate.originalExchange()).thenReturn(base);
         DatabaseTestResult positive = new DatabaseTestResult("id",
                 DatabaseTestStatus.DB_ERROR_DETECTED, DatabaseType.MYSQL,
-                payload.name(), payload.value(), "SQL syntax", DiscoveryConfidence.MEDIUM,
+                payload.name(), payload.value(), "%27", "Auto", "SQL syntax",
+                DiscoveryConfidence.MEDIUM,
                 false, (short) 200, (short) 500, 100, "evidence", base, null);
-        when(engine.execute(base, candidate, payload, EnumSet.of(DatabaseType.MYSQL)))
+        when(engine.execute(base, candidate, payload, EnumSet.of(DatabaseType.MYSQL),
+                PayloadEncodingMode.AUTO))
                 .thenReturn(positive);
         ExtensionConfig extensionConfig = new ExtensionConfig();
         extensionConfig.inScopeOnly.set(false);
@@ -40,10 +43,11 @@ class DatabaseTestCoordinatorTest {
 
         List<DatabaseTestResult> results = coordinator.testPage(List.of(candidate),
                 new DatabaseRunOptions(EnumSet.of(DatabaseType.MYSQL), false,
-                        true, 2, 0));
+                        true, 2, 0, PayloadEncodingMode.AUTO));
 
         assertThat(results).singleElement().satisfies(result -> assertThat(result.verified()).isTrue());
-        verify(engine, times(2)).execute(base, candidate, payload, EnumSet.of(DatabaseType.MYSQL));
+        verify(engine, times(2)).execute(base, candidate, payload,
+                EnumSet.of(DatabaseType.MYSQL), PayloadEncodingMode.AUTO);
         assertThat(repository.all()).hasSize(1);
     }
 }

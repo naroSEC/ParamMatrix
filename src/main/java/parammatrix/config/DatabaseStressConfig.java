@@ -1,5 +1,6 @@
 package parammatrix.config;
 
+import parammatrix.http.PayloadEncodingMode;
 import parammatrix.testing.database.DatabaseRunOptions;
 import parammatrix.testing.database.DatabaseType;
 
@@ -14,6 +15,7 @@ public final class DatabaseStressConfig {
     public final AtomicBoolean verifyPositiveResults = new AtomicBoolean(true);
     public final AtomicInteger maximumRequestsPerPage = new AtomicInteger(20);
     public final AtomicInteger requestDelayMillis = new AtomicInteger(200);
+    private PayloadEncodingMode payloadEncodingMode = PayloadEncodingMode.AUTO;
 
     public synchronized void setSelected(DatabaseType database, boolean selected) {
         if (selected) databases.add(database); else databases.remove(database);
@@ -24,8 +26,13 @@ public final class DatabaseStressConfig {
     }
     public synchronized boolean isSelected(DatabaseType database) { return databases.contains(database); }
     public synchronized Set<DatabaseType> selectedDatabases() { return Set.copyOf(databases); }
+    public synchronized PayloadEncodingMode payloadEncodingMode() { return payloadEncodingMode; }
+    public synchronized void setPayloadEncodingMode(PayloadEncodingMode mode) {
+        payloadEncodingMode = mode;
+    }
     public synchronized DatabaseRunOptions snapshot() {
         return new DatabaseRunOptions(selectedDatabases(), onlyReflectedParameters.get(),
-                verifyPositiveResults.get(), maximumRequestsPerPage.get(), requestDelayMillis.get());
+                verifyPositiveResults.get(), maximumRequestsPerPage.get(), requestDelayMillis.get(),
+                payloadEncodingMode);
     }
 }

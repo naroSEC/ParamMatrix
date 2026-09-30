@@ -2,6 +2,7 @@ package parammatrix.ui;
 
 import parammatrix.config.SstiConfig;
 import parammatrix.core.ExtensionController;
+import parammatrix.http.PayloadEncodingMode;
 import parammatrix.testing.ssti.SstiEngine;
 import parammatrix.testing.ssti.SstiPayloadPatternCatalog;
 import parammatrix.testing.ssti.SstiProgressListener;
@@ -13,6 +14,7 @@ import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
+import javax.swing.JComboBox;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JRadioButton;
@@ -103,8 +105,8 @@ public final class SstiSettingsPanel extends JPanel {
                         "Arithmetic evaluation"});
             }
         }
-        return PayloadPreviewPanel.create("Payloads sent",
-                "<left> and <right> are randomized from 100–899; the marker is unique per request.",
+        return PayloadPreviewPanel.create("Logical payloads",
+                "Values shown here are encoded according to Payload transport before sending.",
                 new String[] {"Engine", "Payload pattern", "Detection"},
                 rows.toArray(Object[][]::new), 1);
     }
@@ -167,6 +169,14 @@ public final class SstiSettingsPanel extends JPanel {
         method.add(title);
         method.add(new JLabel("Randomized arithmetic evaluation"));
         method.add(new JLabel("Exact marker + evaluated-result matching"));
+        method.add(Box.createVerticalStrut(6));
+        method.add(new JLabel("Payload transport"));
+        JComboBox<PayloadEncodingMode> encoding = new JComboBox<>(PayloadEncodingMode.values());
+        encoding.setSelectedItem(config.payloadEncodingMode());
+        encoding.addActionListener(ignored -> config.setPayloadEncodingMode(
+                (PayloadEncodingMode) encoding.getSelectedItem()));
+        method.add(encoding);
+        method.add(new JLabel("Auto encodes URL and form values once"));
         panel.add(scope, BorderLayout.WEST);
         panel.add(limits, BorderLayout.CENTER);
         panel.add(method, BorderLayout.EAST);

@@ -51,7 +51,8 @@ public final class SstiCoordinator {
                                 "Maximum SSTI requests per page reached");
                     } else {
                         if (requests > 0) delay(options.requestDelayMillis());
-                        result = testEngine.execute(candidate.originalExchange(), candidate, payload);
+                        result = testEngine.execute(candidate.originalExchange(), candidate, payload,
+                                options.payloadEncodingMode());
                         requests++;
                     }
                     results.add(result);
@@ -64,8 +65,9 @@ public final class SstiCoordinator {
 
     private SstiTestResult skipped(ParameterCandidate candidate, SstiPayload payload, String reason) {
         return new SstiTestResult(candidate.name(), payload.engine(), SstiTestStatus.SKIPPED,
-                payload.payload(), payload.expectedResult(), "Skipped", payload.detectionMethod(),
-                DiscoveryConfidence.LOW, reason, candidate.originalExchange(), null);
+                payload.payload(), "", "Not applied", payload.expectedResult(), "Skipped",
+                payload.detectionMethod(), DiscoveryConfidence.LOW, reason,
+                candidate.originalExchange(), null);
     }
 
     private void delay(int millis) {

@@ -3,6 +3,7 @@ package parammatrix.testing.ssti;
 import burp.api.montoya.http.message.HttpRequestResponse;
 import org.junit.jupiter.api.Test;
 import parammatrix.config.ExtensionConfig;
+import parammatrix.http.PayloadEncodingMode;
 import parammatrix.model.DiscoveryConfidence;
 import parammatrix.model.ParameterCandidate;
 import parammatrix.storage.SstiResultRepository;
@@ -32,9 +33,9 @@ class SstiCoordinatorTest {
             @Override public List<SstiPayload> payloads() { return List.of(first, second); }
         };
         SstiTestResult executed = new SstiTestResult("name", SstiEngine.GENERIC,
-                SstiTestStatus.NOT_DETECTED, "a", "A", "Not observed",
+                SstiTestStatus.NOT_DETECTED, "a", "a", "Raw", "A", "Not observed",
                 "Arithmetic Evaluation", DiscoveryConfidence.LOW, "none", base, null);
-        when(engine.execute(base, candidate, first)).thenReturn(executed);
+        when(engine.execute(base, candidate, first, PayloadEncodingMode.AUTO)).thenReturn(executed);
         ExtensionConfig extensionConfig = new ExtensionConfig();
         extensionConfig.inScopeOnly.set(false);
         SstiResultRepository repository = new SstiResultRepository();
@@ -42,12 +43,13 @@ class SstiCoordinatorTest {
                 extensionConfig);
 
         List<SstiTestResult> results = coordinator.testPage(List.of(candidate),
-                new SstiRunOptions(Set.of(SstiEngine.GENERIC), false, 1, 0));
+                new SstiRunOptions(Set.of(SstiEngine.GENERIC), false, 1, 0,
+                        PayloadEncodingMode.AUTO));
 
         assertThat(results).hasSize(2);
         assertThat(results).extracting(SstiTestResult::status)
                 .containsExactly(SstiTestStatus.NOT_DETECTED, SstiTestStatus.SKIPPED);
-        verify(engine, times(1)).execute(any(), any(), any());
+        verify(engine, times(1)).execute(any(), any(), any(), any());
         assertThat(repository.all()).hasSize(2);
     }
 }

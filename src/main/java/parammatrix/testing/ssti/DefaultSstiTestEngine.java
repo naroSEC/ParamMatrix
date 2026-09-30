@@ -1,13 +1,12 @@
 package parammatrix.testing.ssti;
 
 import burp.api.montoya.http.message.HttpRequestResponse;
-import burp.api.montoya.http.message.requests.HttpRequest;
+import parammatrix.http.PayloadEncodingMode;
+import parammatrix.http.PayloadMutation;
 import parammatrix.http.RequestMutator;
 import parammatrix.http.RequestSender;
 import parammatrix.model.DiscoveryConfidence;
 import parammatrix.model.ParameterCandidate;
-
-import java.util.Map;
 
 public final class DefaultSstiTestEngine implements SstiTestEngine {
     private final RequestMutator requestMutator;
@@ -20,19 +19,21 @@ public final class DefaultSstiTestEngine implements SstiTestEngine {
 
     @Override
     public SstiTestResult execute(HttpRequestResponse base, ParameterCandidate parameter,
-                                  SstiPayload payload) {
+                                  SstiPayload payload, PayloadEncodingMode encodingMode) {
+        PayloadMutation mutation = null;
         try {
             if (base.hasResponse() && base.response().bodyToString().contains(payload.expectedResult())) {
                 return result(parameter, payload, SstiTestStatus.SKIPPED,
                         "Expected token already existed in the original response", "Baseline collision",
                         DiscoveryConfidence.LOW, base, null);
             }
-            HttpRequest request = requestMutator.inject(base.request(),
-                    Map.of(parameter.name(), payload.payload()));
-            HttpRequestResponse exchange = sender.send(request);
+            mutation = requestMutator.injectPayload(base.request(), parameter.name(),
+                    payload.payload(), encodingMode);
+            HttpRequestResponse exchange = sender.send(mutation.request());
             if (!exchange.hasResponse()) {
                 return result(parameter, payload, SstiTestStatus.ERROR,
-                        "No response received", "No response", DiscoveryConfidence.LOW, base, exchange);
+                        "No response received", "No response", DiscoveryConfidence.LOW, base,
+                        exchange, mutation);
             }
             String body = exchange.response().bodyToString();
             boolean detected = body.contains(payload.expectedResult());
@@ -42,11 +43,11 @@ public final class DefaultSstiTestEngine implements SstiTestEngine {
                             : "Expected evaluated token was not present in the response",
                     detected ? payload.expectedResult() : "Not observed",
                     detected ? DiscoveryConfidence.HIGH : DiscoveryConfidence.LOW,
-                    base, exchange);
+                    base, exchange, mutation);
         } catch (RuntimeException exception) {
             return result(parameter, payload, SstiTestStatus.ERROR,
                     exception.getClass().getSimpleName() + ": " + exception.getMessage(),
-                    "Error", DiscoveryConfidence.LOW, base, null);
+                    "Error", DiscoveryConfidence.LOW, base, null, mutation);
         }
     }
 
@@ -54,9 +55,19 @@ public final class DefaultSstiTestEngine implements SstiTestEngine {
                                   SstiTestStatus status, String evidence, String actual,
                                   DiscoveryConfidence confidence, HttpRequestResponse original,
                                   HttpRequestResponse test) {
+        return result(parameter, payload, status, evidence, actual, confidence, original, test,
+                null);
+    }
+
+    private SstiTestResult result(ParameterCandidate parameter, SstiPayload payload,
+                                  SstiTestStatus status, String evidence, String actual,
+                                  DiscoveryConfidence confidence, HttpRequestResponse original,
+                                  HttpRequestResponse test, PayloadMutation mutation) {
         return new SstiTestResult(parameter.name(), payload.engine(), status, payload.payload(),
-                payload.expectedResult(), actual, payload.detectionMethod(), confidence, evidence,
-                original, test);
+                mutation == null ? "" : mutation.wireValue(),
+                mutation == null ? "Not applied" : mutation.encodingDescription(),
+                payload.expectedResult(), actual, payload.detectionMethod(), confidence,
+                evidence, original, test);
     }
 
     private String evidence(String body, String expected) {

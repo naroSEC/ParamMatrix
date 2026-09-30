@@ -23,7 +23,7 @@ public final class SimpleJsonRequestInjector implements JsonRequestInjector {
         return request.withBody(replacement);
     }
 
-    private static String escape(String value) {
+    static String escape(String value) {
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

@@ -42,6 +42,53 @@ public final class RequestMutator {
         return additions.isEmpty() ? mutated : mutated.withAddedParameters(additions);
     }
 
+    public PayloadMutation injectPayload(HttpRequest original, String name, String logicalValue,
+                                         PayloadEncodingMode mode) {
+        String contentType = value(original.headerValue("Content-Type")).toLowerCase(Locale.ROOT);
+        if (contentType.contains("application/json")) {
+            HttpRequest request = jsonInjector.inject(original, Map.of(name, logicalValue));
+            return new PayloadMutation(request, logicalValue,
+                    SimpleJsonRequestInjector.escape(logicalValue), "JSON string escaping");
+        }
+
+        ParsedHttpParameter existing = original.parameters().stream()
+                .filter(parameter -> parameter.name().equals(name))
+                .filter(parameter -> MUTABLE_EXISTING_TYPES.contains(parameter.type()))
+                .findFirst().orElse(null);
+        HttpParameterType type = existing == null ? parameterType(original, contentType)
+                : existing.type();
+        String wireName = mode == PayloadEncodingMode.AUTO
+                ? FormUrlEncodedMutator.encode(name) : name;
+        String wireValue = mode == PayloadEncodingMode.AUTO
+                ? FormUrlEncodedMutator.encode(logicalValue) : logicalValue;
+
+        if (type == HttpParameterType.URL) {
+            String query = FormUrlEncodedMutator.mutate(original.query(), name, wireName, wireValue);
+            String path = original.pathWithoutQuery() + (query.isEmpty() ? "" : "?" + query);
+            return new PayloadMutation(original.withPath(path), logicalValue, wireValue,
+                    description(mode, "URL query"));
+        }
+        if (type == HttpParameterType.BODY) {
+            String body = FormUrlEncodedMutator.mutate(original.bodyToString(), name,
+                    wireName, wireValue);
+            return new PayloadMutation(original.withBody(body), logicalValue, wireValue,
+                    description(mode, "form body"));
+        }
+
+        HttpParameter parameter = HttpParameter.parameter(name, logicalValue, type);
+        HttpRequest request = existing == null
+                ? original.withAddedParameters(List.of(parameter))
+                : original.withUpdatedParameters(List.of(parameter));
+        return new PayloadMutation(request, logicalValue, logicalValue,
+                "Raw multipart field value");
+    }
+
+    private static String description(PayloadEncodingMode mode, String location) {
+        return mode == PayloadEncodingMode.AUTO
+                ? "UTF-8 form percent encoding (once, " + location + ")"
+                : "Raw value (" + location + ")";
+    }
+
     private static HttpParameterType parameterType(HttpRequest request, String contentType) {
         String method = request.method().toUpperCase(Locale.ROOT);
         if (method.equals("GET") || method.equals("HEAD") || method.equals("DELETE")) {

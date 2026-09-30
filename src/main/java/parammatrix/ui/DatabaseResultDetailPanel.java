@@ -59,7 +59,10 @@ public final class DatabaseResultDetailPanel extends JPanel {
                 + "\nVerified: " + result.verified()
                 + "\nHTTP status: " + result.originalStatus() + " -> " + result.testStatus()
                 + "\nResponse length delta: " + result.responseLengthDelta()
-                + "\n\nPayload\n-------\n" + result.payloadName() + ": " + result.payload()
+                + "\nEncoding: " + result.encodingDescription()
+                + "\n\nLogical payload\n---------------\n" + result.payloadName() + ": "
+                + result.payload()
+                + "\n\nWire value\n----------\n" + result.wirePayload()
                 + "\n\nError signature\n---------------\n" + result.errorSignature()
                 + "\n\nEvidence\n--------\n" + result.evidence());
         evidence.setCaretPosition(0);

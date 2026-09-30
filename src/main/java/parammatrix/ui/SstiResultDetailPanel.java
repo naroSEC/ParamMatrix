@@ -57,7 +57,9 @@ public final class SstiResultDetailPanel extends JPanel {
                 + "\nTemplate engine: " + result.templateEngine()
                 + "\nDetection method: " + result.detectionMethod()
                 + "\nConfidence: " + result.confidence()
-                + "\n\nPayload\n-------\n" + result.payload()
+                + "\nEncoding: " + result.encodingDescription()
+                + "\n\nLogical payload\n---------------\n" + result.payload()
+                + "\n\nWire value\n----------\n" + result.wirePayload()
                 + "\n\nExpected result\n---------------\n" + result.expectedResult()
                 + "\n\nActual result\n-------------\n" + result.actualResult()
                 + "\n\nEvidence\n--------\n" + result.evidence());

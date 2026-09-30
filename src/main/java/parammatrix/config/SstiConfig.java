@@ -1,5 +1,6 @@
 package parammatrix.config;
 
+import parammatrix.http.PayloadEncodingMode;
 import parammatrix.testing.ssti.SstiEngine;
 import parammatrix.testing.ssti.SstiRunOptions;
 
@@ -13,6 +14,7 @@ public final class SstiConfig {
     public final AtomicBoolean onlyReflectedParameters = new AtomicBoolean(false);
     public final AtomicInteger maximumRequestsPerPage = new AtomicInteger(30);
     public final AtomicInteger requestDelayMillis = new AtomicInteger(200);
+    private PayloadEncodingMode payloadEncodingMode = PayloadEncodingMode.AUTO;
 
     public synchronized void setSelected(SstiEngine engine, boolean selected) {
         if (selected) selectedEngines.add(engine);
@@ -32,9 +34,17 @@ public final class SstiConfig {
         return Set.copyOf(selectedEngines);
     }
 
+    public synchronized PayloadEncodingMode payloadEncodingMode() {
+        return payloadEncodingMode;
+    }
+
+    public synchronized void setPayloadEncodingMode(PayloadEncodingMode mode) {
+        payloadEncodingMode = mode;
+    }
+
     public synchronized SstiRunOptions snapshot() {
         return new SstiRunOptions(selectedEngines(), onlyReflectedParameters.get(),
-                maximumRequestsPerPage.get(), requestDelayMillis.get());
+                maximumRequestsPerPage.get(), requestDelayMillis.get(), payloadEncodingMode);
     }
 }
 

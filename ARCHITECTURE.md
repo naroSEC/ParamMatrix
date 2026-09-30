@@ -88,6 +88,11 @@ parameters or adds new ones; Cookie parameters are never selected as an injectio
 individual probes share a strict per-page request budget. Scope restriction, delay, concurrency, pause,
 pending-queue clear and generated-request fingerprints are independent controls.
 
+SSTI and database modules use the transport-aware payload path. Auto mode percent-encodes URL query
+and form-body components once without reserializing unrelated fields. JSON uses JSON escaping and
+multipart values remain native. Raw mode is available for targets that require literal delimiters.
+Every active-test result retains the logical payload, wire value, and encoding description.
+
 ## SSTI pipeline
 
 SSTI is a peer testing module, not a subclass of reflection. `SstiCoordinator` applies the selected
