@@ -1,6 +1,7 @@
 package parammatrix.scan;
 
 import burp.api.montoya.MontoyaApi;
+import burp.api.montoya.http.message.Cookie;
 import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.proxy.ProxyHttpRequestResponse;
 import parammatrix.config.ExtensionConfig;
@@ -11,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.time.ZonedDateTime;
 
 public final class HistoryScanService {
     private final MontoyaApi api;
@@ -65,8 +67,27 @@ public final class HistoryScanService {
                     config.identityIgnoresParameterValues.get());
             if (eligible.putIfAbsent(identity, item) != null) duplicates++;
         }
-        ScanSummary summary = new ScanSummary(source.size() + withoutResponse, eligible.size(),
-                excludedByMethod, excludedByPath, duplicates, withoutResponse);
-        return new ScanBatch(List.copyOf(eligible.values()), summary);
+        List<HttpRequestResponse> exchanges = List.copyOf(eligible.values());
+        int cookiesRefreshed = 0;
+        if (options.refreshCookiesFromJar() && !exchanges.isEmpty()) {
+            List<Cookie> cookies = api.http().cookieJar().cookies();
+            ScanCookieRefresher refresher = new ScanCookieRefresher();
+            List<HttpRequestResponse> refreshed = new ArrayList<>(exchanges.size());
+            ZonedDateTime now = ZonedDateTime.now();
+            for (HttpRequestResponse exchange : exchanges) {
+                ScanCookieRefresher.RefreshResult result = refresher.refresh(exchange, cookies, now);
+                if (result.refreshed()) {
+                    refreshed.add(HttpRequestResponse.httpRequestResponse(
+                            result.request(), exchange.response(), exchange.annotations()));
+                    cookiesRefreshed++;
+                } else {
+                    refreshed.add(exchange);
+                }
+            }
+            exchanges = List.copyOf(refreshed);
+        }
+        ScanSummary summary = new ScanSummary(source.size() + withoutResponse, exchanges.size(),
+                excludedByMethod, excludedByPath, duplicates, withoutResponse, cookiesRefreshed);
+        return new ScanBatch(exchanges, summary);
     }
 }

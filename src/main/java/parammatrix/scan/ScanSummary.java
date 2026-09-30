@@ -6,6 +6,7 @@ public record ScanSummary(
         int excludedByMethod,
         int excludedByPath,
         int duplicates,
-        int withoutResponse) {
+        int withoutResponse,
+        int cookiesRefreshed) {
 }
 

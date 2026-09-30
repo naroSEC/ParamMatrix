@@ -10,6 +10,7 @@ public record ScanOptions(
         boolean runReflectionTests,
         boolean runSstiTests,
         boolean runDatabaseTests,
+        boolean refreshCookiesFromJar,
         List<String> excludedPathRules) {
 
     public ScanOptions {

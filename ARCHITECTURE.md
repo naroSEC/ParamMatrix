@@ -14,7 +14,8 @@
 
 - `burp` — the single Montoya entry point and registration/composition root.
 - `core` — workflow orchestration, Proxy auto-analyzer, context menu and bounded/pausable worker queue.
-- `scan` — Proxy History/Site Map collection, GET/POST filtering, exclusion rules and scan progress.
+- `scan` — Proxy History/Site Map collection, GET/POST filtering, exclusion rules, optional Cookie Jar
+  refresh and scan progress.
 - `config` — thread-safe runtime settings.
 - `discovery` — response classification, jsoup-based HTML extraction, replaceable JavaScript parser and
   evidence aggregation.
@@ -26,7 +27,7 @@
 - `testing.ssti` — safe arithmetic payload providers, execution coordinator, engine and result schema.
 - `testing.database` — syntax stress payloads, DB error testing, confirmation and result schema.
 - `storage` — canonical page/name result repository and UI change notifications.
-- `ui` — results table, Burp message editors, evidence view, settings, queue controls and SSTI placeholder.
+- `ui` — result tables, Burp message editors, evidence views, test configuration and global queue controls.
 
 ## Data flow
 
@@ -60,6 +61,9 @@ Proxy response or context-menu selection
 The History Scan entry point first merges Proxy History and Site Map/crawl records, applies method and
 path exclusions, and deduplicates them by `PageIdentity`. Eligible exchanges then enter the same
 controller and worker queue as manual analysis, preserving page isolation and all active-test limits.
+When enabled for a Scan run, `ScanCookieRefresher` replaces only the test copy's Cookie header with
+unexpired Burp Cookie Jar values matching the request host and path. Recorded Burp traffic remains
+unchanged, and requests without a matching current cookie retain their original header.
 
 ## Page isolation and duplicate policy
 

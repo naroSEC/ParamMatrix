@@ -42,6 +42,8 @@ public final class HistoryScanPanel extends JPanel {
     private final JRadioButton discoverAndTest = new JRadioButton("Discover + reflection test", true);
     private final JCheckBox includeSsti = new JCheckBox("Include SSTI testing", false);
     private final JCheckBox includeDatabase = new JCheckBox("Include DB error testing", false);
+    private final JCheckBox refreshCookies = new JCheckBox(
+            "Refresh Cookie header from Burp Cookie Jar", false);
     private final JTextArea exclusions = new JTextArea(8, 42);
     private final JButton start = new JButton("Start history scan");
     private final JButton cancel = new JButton("Cancel current scan");
@@ -81,9 +83,10 @@ public final class HistoryScanPanel extends JPanel {
         JPanel content = new JPanel();
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
 
-        JPanel filters = new JPanel(new GridLayout(1, 2, 12, 0));
+        JPanel filters = new JPanel(new GridLayout(1, 3, 12, 0));
         filters.add(sourceCard());
         filters.add(methodCard());
+        filters.add(sessionCard());
         content.add(filters);
         content.add(Box.createVerticalStrut(12));
 
@@ -113,6 +116,17 @@ public final class HistoryScanPanel extends JPanel {
         row.add(post);
         panel.add(row);
         panel.add(new JLabel("Other methods are skipped."));
+        return panel;
+    }
+
+    private JPanel sessionCard() {
+        JPanel panel = card("Session cookies",
+                "Optionally replace stale history cookies before active tests.");
+        refreshCookies.setToolTipText(
+                "Builds a current Cookie header from Burp Cookie Jar entries matching host and path");
+        panel.add(refreshCookies);
+        panel.add(new JLabel("Burp history is not modified."));
+        panel.add(new JLabel("If no cookie matches, the original header is preserved."));
         return panel;
     }
 
@@ -199,7 +213,8 @@ public final class HistoryScanPanel extends JPanel {
         List<String> rules = exclusions.getText().lines().toList();
         ScanOptions options = new ScanOptions(proxyHistory.isSelected(), siteMap.isSelected(),
                 get.isSelected(), post.isSelected(), discoverAndTest.isSelected(),
-                includeSsti.isSelected(), includeDatabase.isSelected(), rules);
+                includeSsti.isSelected(), includeDatabase.isSelected(),
+                refreshCookies.isSelected(), rules);
         if (includeSsti.isSelected() && sstiConfig.selectedEngines().isEmpty()) {
             showValidation("Select at least one engine in SSTI Test.");
             return;
@@ -317,7 +332,8 @@ public final class HistoryScanPanel extends JPanel {
                     + "  |  Method: " + value.excludedByMethod()
                     + "  |  Path: " + value.excludedByPath()
                     + "  |  Duplicates: " + value.duplicates()
-                    + "  |  No response: " + value.withoutResponse();
+                    + "  |  No response: " + value.withoutResponse()
+                    + "  |  Cookies refreshed: " + value.cookiesRefreshed();
         }
     }
 }

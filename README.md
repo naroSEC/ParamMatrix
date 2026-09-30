@@ -51,7 +51,7 @@ On Linux or macOS:
 The extension JAR is written to:
 
 ```text
-build/libs/param-matrix-1.3.3.jar
+build/libs/param-matrix-1.3.4.jar
 ```
 
 jsoup is bundled in the output JAR. The Montoya API is supplied by Burp and is therefore declared as
@@ -61,7 +61,7 @@ a compile-only dependency.
 
 1. Open **Extensions > Installed** in Burp Suite.
 2. Click **Add** and select **Java**.
-3. Choose `build/libs/param-matrix-1.3.3.jar`.
+3. Choose `build/libs/param-matrix-1.3.4.jar`.
 4. Confirm that the **ParamMatrix** tab appears.
 
 Automatic analysis is disabled on first load.
@@ -112,6 +112,12 @@ after discovery. The option is disabled by default.
 
 Enable **Include DB error testing** to apply the signature families and safety settings selected in
 the **DB Stress Test** tab. This option is also disabled by default.
+
+Enable **Refresh Cookie header from Burp Cookie Jar** when older history entries contain stale session
+cookies. Before testing each eligible page, ParamMatrix builds a current Cookie header from unexpired
+Cookie Jar entries matching the request host and path. The original Proxy History and Site Map records
+are not modified. When no matching current cookie exists, the recorded Cookie header is preserved.
+This option is disabled by default and applies only to that Scan run.
 
 Excluded paths accept one rule per line:
 
