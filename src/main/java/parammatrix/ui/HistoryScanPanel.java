@@ -4,6 +4,7 @@ import parammatrix.core.ExtensionController;
 import parammatrix.config.SstiConfig;
 import parammatrix.config.DatabaseStressConfig;
 import parammatrix.scan.ScanOptions;
+import parammatrix.scan.ScanCookieMode;
 import parammatrix.scan.ScanProgressListener;
 import parammatrix.scan.ScanSummary;
 
@@ -20,6 +21,7 @@ import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
@@ -42,8 +44,14 @@ public final class HistoryScanPanel extends JPanel {
     private final JRadioButton discoverAndTest = new JRadioButton("Discover + reflection test", true);
     private final JCheckBox includeSsti = new JCheckBox("Include SSTI testing", false);
     private final JCheckBox includeDatabase = new JCheckBox("Include DB error testing", false);
-    private final JCheckBox refreshCookies = new JCheckBox(
-            "Refresh Cookie header from Burp Cookie Jar", false);
+    private final JRadioButton keepRecordedCookies = new JRadioButton(
+            "Keep recorded Cookie header", true);
+    private final JRadioButton useCookieJar = new JRadioButton(
+            "Refresh from Burp Cookie Jar");
+    private final JRadioButton useCustomCookie = new JRadioButton(
+            "Use custom Cookie header");
+    private final JTextField customCookieHost = new JTextField(22);
+    private final JTextField customCookieHeader = new JTextField(28);
     private final JTextArea exclusions = new JTextArea(8, 42);
     private final JButton start = new JButton("Start history scan");
     private final JButton cancel = new JButton("Cancel current scan");
@@ -122,12 +130,42 @@ public final class HistoryScanPanel extends JPanel {
     private JPanel sessionCard() {
         JPanel panel = card("Session cookies",
                 "Optionally replace stale history cookies before active tests.");
-        refreshCookies.setToolTipText(
+        ButtonGroup group = new ButtonGroup();
+        group.add(keepRecordedCookies);
+        group.add(useCookieJar);
+        group.add(useCustomCookie);
+        useCookieJar.setToolTipText(
                 "Builds a current Cookie header from Burp Cookie Jar entries matching host and path");
-        panel.add(refreshCookies);
-        panel.add(new JLabel("Burp history is not modified."));
-        panel.add(new JLabel("If no cookie matches, the original header is preserved."));
+        useCustomCookie.setToolTipText(
+                "Replaces Cookie only for requests whose host exactly matches the target host");
+        keepRecordedCookies.addActionListener(ignored -> updateCustomCookieFields());
+        useCookieJar.addActionListener(ignored -> updateCustomCookieFields());
+        useCustomCookie.addActionListener(ignored -> updateCustomCookieFields());
+        panel.add(keepRecordedCookies);
+        panel.add(useCookieJar);
+        panel.add(useCustomCookie);
+        panel.add(textFieldRow("Target host", customCookieHost));
+        panel.add(textFieldRow("Cookie", customCookieHeader));
+        JLabel note = new JLabel("Custom values stay visible and are not saved.");
+        note.setBorder(new EmptyBorder(5, 2, 0, 0));
+        panel.add(note);
+        updateCustomCookieFields();
         return panel;
+    }
+
+    private JPanel textFieldRow(String label, JTextField field) {
+        JPanel row = new JPanel(new BorderLayout(8, 0));
+        row.setBorder(new EmptyBorder(2, 2, 2, 2));
+        row.add(new JLabel(label), BorderLayout.WEST);
+        row.add(field, BorderLayout.CENTER);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
+        return row;
+    }
+
+    private void updateCustomCookieFields() {
+        boolean enabled = useCustomCookie.isSelected();
+        customCookieHost.setEnabled(enabled);
+        customCookieHeader.setEnabled(enabled);
     }
 
     private JPanel modeCard() {
@@ -210,11 +248,21 @@ public final class HistoryScanPanel extends JPanel {
             showValidation("Select GET, POST, or both.");
             return;
         }
-        List<String> rules = exclusions.getText().lines().toList();
-        ScanOptions options = new ScanOptions(proxyHistory.isSelected(), siteMap.isSelected(),
-                get.isSelected(), post.isSelected(), discoverAndTest.isSelected(),
-                includeSsti.isSelected(), includeDatabase.isSelected(),
-                refreshCookies.isSelected(), rules);
+        if (useCustomCookie.isSelected() && customCookieHost.getText().isBlank()) {
+            showValidation("Enter the exact target host for the custom Cookie header.");
+            return;
+        }
+        if (useCustomCookie.isSelected() && customCookieHeader.getText().isBlank()) {
+            showValidation("Enter a custom Cookie header value.");
+            return;
+        }
+        if (useCustomCookie.isSelected()
+                && (customCookieHost.getText().contains("://")
+                || customCookieHost.getText().contains("/")
+                || customCookieHost.getText().contains(" "))) {
+            showValidation("Target host must be a hostname only, for example app.example.com.");
+            return;
+        }
         if (includeSsti.isSelected() && sstiConfig.selectedEngines().isEmpty()) {
             showValidation("Select at least one engine in SSTI Test.");
             return;
@@ -233,6 +281,15 @@ public final class HistoryScanPanel extends JPanel {
             showValidation("Reflected-only DB testing requires Discover + reflection test.");
             return;
         }
+        List<String> rules = exclusions.getText().lines().toList();
+        ScanCookieMode cookieMode = useCookieJar.isSelected()
+                ? ScanCookieMode.BURP_COOKIE_JAR
+                : useCustomCookie.isSelected()
+                ? ScanCookieMode.CUSTOM_HEADER : ScanCookieMode.KEEP_RECORDED;
+        ScanOptions options = new ScanOptions(proxyHistory.isSelected(), siteMap.isSelected(),
+                get.isSelected(), post.isSelected(), discoverAndTest.isSelected(),
+                includeSsti.isSelected(), includeDatabase.isSelected(), cookieMode,
+                customCookieHost.getText(), customCookieHeader.getText(), rules);
         setScanRunning(true);
         progress.setIndeterminate(true);
         progress.setString("Collecting traffic...");
@@ -333,7 +390,7 @@ public final class HistoryScanPanel extends JPanel {
                     + "  |  Path: " + value.excludedByPath()
                     + "  |  Duplicates: " + value.duplicates()
                     + "  |  No response: " + value.withoutResponse()
-                    + "  |  Cookies refreshed: " + value.cookiesRefreshed();
+                    + "  |  Cookie headers updated: " + value.cookieHeadersUpdated();
         }
     }
 }

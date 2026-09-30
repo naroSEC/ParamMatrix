@@ -61,9 +61,11 @@ Proxy response or context-menu selection
 The History Scan entry point first merges Proxy History and Site Map/crawl records, applies method and
 path exclusions, and deduplicates them by `PageIdentity`. Eligible exchanges then enter the same
 controller and worker queue as manual analysis, preserving page isolation and all active-test limits.
-When enabled for a Scan run, `ScanCookieRefresher` replaces only the test copy's Cookie header with
-unexpired Burp Cookie Jar values matching the request host and path. Recorded Burp traffic remains
-unchanged, and requests without a matching current cookie retain their original header.
+For each Scan run, `ScanCookieRefresher` can retain recorded cookies, replace only the test copy's
+Cookie header with unexpired Burp Cookie Jar values matching the request host and path, or apply a
+visible user-entered Cookie value to one exact host. Recorded Burp traffic remains unchanged, and
+requests without a matching Cookie Jar entry retain their original header. Custom values are not
+persisted and line breaks are rejected before request construction.
 
 ## Page isolation and duplicate policy
 

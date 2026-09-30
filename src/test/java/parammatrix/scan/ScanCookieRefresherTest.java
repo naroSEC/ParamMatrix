@@ -70,6 +70,33 @@ class ScanCookieRefresherTest {
         verify(request).withAddedHeader("Cookie", "session=fresh");
     }
 
+    @Test
+    void appliesVisibleCustomCookieOnlyToTheExactTargetHost() {
+        HttpRequest request = request("app.example.test", "/account", true);
+        HttpRequest changed = mock(HttpRequest.class);
+        when(request.withUpdatedHeader("Cookie", "session=manual; role=admin"))
+                .thenReturn(changed);
+
+        ScanCookieRefresher.RefreshResult result = new ScanCookieRefresher()
+                .replaceWithCustom(exchange(request), "app.example.test",
+                        "Cookie: session=manual; role=admin");
+
+        assertThat(result.refreshed()).isTrue();
+        assertThat(result.request()).isSameAs(changed);
+        verify(request).withUpdatedHeader("Cookie", "session=manual; role=admin");
+    }
+
+    @Test
+    void doesNotSendCustomCookieToAnotherHost() {
+        HttpRequest request = request("other.example.test", "/", true);
+
+        ScanCookieRefresher.RefreshResult result = new ScanCookieRefresher()
+                .replaceWithCustom(exchange(request), "app.example.test", "session=manual");
+
+        assertThat(result.refreshed()).isFalse();
+        assertThat(result.request()).isSameAs(request);
+    }
+
     private HttpRequest request(String host, String path, boolean hasCookie) {
         HttpRequest request = mock(HttpRequest.class);
         HttpService service = mock(HttpService.class);

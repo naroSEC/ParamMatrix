@@ -68,18 +68,24 @@ public final class HistoryScanService {
             if (eligible.putIfAbsent(identity, item) != null) duplicates++;
         }
         List<HttpRequestResponse> exchanges = List.copyOf(eligible.values());
-        int cookiesRefreshed = 0;
-        if (options.refreshCookiesFromJar() && !exchanges.isEmpty()) {
-            List<Cookie> cookies = api.http().cookieJar().cookies();
+        int cookieHeadersUpdated = 0;
+        if (options.cookieMode() != ScanCookieMode.KEEP_RECORDED && !exchanges.isEmpty()) {
+            List<Cookie> cookies = options.cookieMode() == ScanCookieMode.BURP_COOKIE_JAR
+                    ? api.http().cookieJar().cookies() : List.of();
             ScanCookieRefresher refresher = new ScanCookieRefresher();
             List<HttpRequestResponse> refreshed = new ArrayList<>(exchanges.size());
             ZonedDateTime now = ZonedDateTime.now();
             for (HttpRequestResponse exchange : exchanges) {
-                ScanCookieRefresher.RefreshResult result = refresher.refresh(exchange, cookies, now);
+                ScanCookieRefresher.RefreshResult result = switch (options.cookieMode()) {
+                    case BURP_COOKIE_JAR -> refresher.refresh(exchange, cookies, now);
+                    case CUSTOM_HEADER -> refresher.replaceWithCustom(exchange,
+                            options.customCookieHost(), options.customCookieHeader());
+                    case KEEP_RECORDED -> throw new IllegalStateException("Unexpected cookie mode");
+                };
                 if (result.refreshed()) {
                     refreshed.add(HttpRequestResponse.httpRequestResponse(
                             result.request(), exchange.response(), exchange.annotations()));
-                    cookiesRefreshed++;
+                    cookieHeadersUpdated++;
                 } else {
                     refreshed.add(exchange);
                 }
@@ -87,7 +93,8 @@ public final class HistoryScanService {
             exchanges = List.copyOf(refreshed);
         }
         ScanSummary summary = new ScanSummary(source.size() + withoutResponse, exchanges.size(),
-                excludedByMethod, excludedByPath, duplicates, withoutResponse, cookiesRefreshed);
+                excludedByMethod, excludedByPath, duplicates, withoutResponse,
+                cookieHeadersUpdated);
         return new ScanBatch(exchanges, summary);
     }
 }

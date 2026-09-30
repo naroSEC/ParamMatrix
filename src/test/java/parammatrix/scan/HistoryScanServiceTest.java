@@ -30,14 +30,15 @@ class HistoryScanServiceTest {
 
         HistoryScanService service = new HistoryScanService(api, new ExtensionConfig());
         ScanBatch batch = service.collect(new ScanOptions(false, true, true, false,
-                true, false, false, false, List.of("/static/*")));
+                true, false, false, ScanCookieMode.KEEP_RECORDED,
+                "", "", List.of("/static/*")));
 
         assertThat(batch.exchanges()).hasSize(1);
         assertThat(batch.summary().sourceRecords()).isEqualTo(4);
         assertThat(batch.summary().excludedByMethod()).isEqualTo(1);
         assertThat(batch.summary().excludedByPath()).isEqualTo(1);
         assertThat(batch.summary().duplicates()).isEqualTo(1);
-        assertThat(batch.summary().cookiesRefreshed()).isZero();
+        assertThat(batch.summary().cookieHeadersUpdated()).isZero();
     }
 
     private HttpRequestResponse exchange(String method, String path) {

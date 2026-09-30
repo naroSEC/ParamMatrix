@@ -51,7 +51,7 @@ On Linux or macOS:
 The extension JAR is written to:
 
 ```text
-build/libs/param-matrix-1.3.4.jar
+build/libs/param-matrix-1.3.5.jar
 ```
 
 jsoup is bundled in the output JAR. The Montoya API is supplied by Burp and is therefore declared as
@@ -61,7 +61,7 @@ a compile-only dependency.
 
 1. Open **Extensions > Installed** in Burp Suite.
 2. Click **Add** and select **Java**.
-3. Choose `build/libs/param-matrix-1.3.4.jar`.
+3. Choose `build/libs/param-matrix-1.3.5.jar`.
 4. Confirm that the **ParamMatrix** tab appears.
 
 Automatic analysis is disabled on first load.
@@ -113,11 +113,18 @@ after discovery. The option is disabled by default.
 Enable **Include DB error testing** to apply the signature families and safety settings selected in
 the **DB Stress Test** tab. This option is also disabled by default.
 
-Enable **Refresh Cookie header from Burp Cookie Jar** when older history entries contain stale session
-cookies. Before testing each eligible page, ParamMatrix builds a current Cookie header from unexpired
-Cookie Jar entries matching the request host and path. The original Proxy History and Site Map records
-are not modified. When no matching current cookie exists, the recorded Cookie header is preserved.
-This option is disabled by default and applies only to that Scan run.
+The **Session cookies** card provides three modes for each Scan run:
+
+- **Keep recorded Cookie header** leaves the historical request unchanged and is the default.
+- **Refresh from Burp Cookie Jar** builds a current Cookie header from unexpired Cookie Jar entries
+  matching the request host and path. A login session stored in Burp's Cookie Jar is therefore used for
+  authenticated pages when its domain and path match.
+- **Use custom Cookie header** applies a user-entered, visible Cookie value only to the exact target
+  host entered alongside it. The value is kept in memory for the open extension UI and is not persisted.
+
+The original Proxy History and Site Map records are never modified. When the Cookie Jar has no matching
+current cookie, the recorded Cookie header is preserved. Cookie modes update Cookie headers only;
+non-cookie authentication such as an `Authorization` bearer token is not refreshed.
 
 Excluded paths accept one rule per line:
 

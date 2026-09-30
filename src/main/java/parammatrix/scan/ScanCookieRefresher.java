@@ -35,6 +35,20 @@ final class ScanCookieRefresher {
         return new RefreshResult(refreshed, true);
     }
 
+    RefreshResult replaceWithCustom(HttpRequestResponse exchange, String targetHost,
+                                    String customCookieHeader) {
+        HttpRequest request = exchange.request();
+        if (!request.httpService().host().equalsIgnoreCase(targetHost)) {
+            return new RefreshResult(request, false);
+        }
+        String headerValue = normalizeCustomHeader(customCookieHeader);
+        if (headerValue.isBlank()) return new RefreshResult(request, false);
+        HttpRequest refreshed = request.hasHeader("Cookie")
+                ? request.withUpdatedHeader("Cookie", headerValue)
+                : request.withAddedHeader("Cookie", headerValue);
+        return new RefreshResult(refreshed, true);
+    }
+
     private boolean usable(Cookie cookie, String host, String requestPath, ZonedDateTime now) {
         if (cookie.name() == null || cookie.name().isBlank() || cookie.value() == null) return false;
         if (cookie.expiration().isPresent() && !cookie.expiration().get().isAfter(now)) return false;
@@ -67,6 +81,14 @@ final class ScanCookieRefresher {
 
     private String normalizeCookiePath(String path) {
         return path == null || path.isBlank() || !path.startsWith("/") ? "/" : path;
+    }
+
+    private String normalizeCustomHeader(String value) {
+        String trimmed = value == null ? "" : value.trim();
+        if (trimmed.regionMatches(true, 0, "Cookie:", 0, "Cookie:".length())) {
+            return trimmed.substring("Cookie:".length()).trim();
+        }
+        return trimmed;
     }
 
     record RefreshResult(HttpRequest request, boolean refreshed) {
