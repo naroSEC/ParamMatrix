@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import parammatrix.config.ExtensionConfig;
 
 import java.util.List;
+import java.util.ArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -29,9 +30,15 @@ class HistoryScanServiceTest {
         when(siteMap.requestResponses()).thenReturn(records);
 
         HistoryScanService service = new HistoryScanService(api, new ExtensionConfig());
+        List<ScanCollectionProgress> progress = new ArrayList<>();
         ScanBatch batch = service.collect(new ScanOptions(false, true, true, false,
-                true, false, false, ScanCookieMode.KEEP_RECORDED,
-                "", "", List.of("/static/*")));
+                        true, false, false, ScanCookieMode.KEEP_RECORDED,
+                        "", "", List.of("/static/*")),
+                new ScanProgressListener() {
+                    @Override public void collectionProgress(ScanCollectionProgress value) {
+                        progress.add(value);
+                    }
+                });
 
         assertThat(batch.exchanges()).hasSize(1);
         assertThat(batch.summary().sourceRecords()).isEqualTo(4);
@@ -39,6 +46,15 @@ class HistoryScanServiceTest {
         assertThat(batch.summary().excludedByPath()).isEqualTo(1);
         assertThat(batch.summary().duplicates()).isEqualTo(1);
         assertThat(batch.summary().cookieHeadersUpdated()).isZero();
+        assertThat(progress).extracting(ScanCollectionProgress::stage)
+                .contains("Loading Site Map / Crawl records from Burp",
+                        "Reading Site Map / Crawl",
+                        "Filtering methods, paths, and duplicates");
+        assertThat(progress).anySatisfy(value -> {
+            assertThat(value.stage()).isEqualTo("Filtering methods, paths, and duplicates");
+            assertThat(value.completed()).isEqualTo(4);
+            assertThat(value.total()).isEqualTo(4);
+        });
     }
 
     private HttpRequestResponse exchange(String method, String path) {

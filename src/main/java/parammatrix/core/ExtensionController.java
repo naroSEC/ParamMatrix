@@ -98,7 +98,7 @@ public final class ExtensionController implements AutoCloseable {
             try {
                 if (run.cancelled()) return;
                 listener.collectionStarted();
-                ScanBatch batch = historyScanService.collect(options);
+                ScanBatch batch = historyScanService.collect(options, listener);
                 if (run.cancelled()) return;
                 listener.scanStarted(batch.summary());
                 int total = batch.exchanges().size();
@@ -107,16 +107,25 @@ public final class ExtensionController implements AutoCloseable {
                     return;
                 }
                 AtomicInteger completed = new AtomicInteger();
+                AtomicInteger started = new AtomicInteger();
                 Action action = options.runReflectionTests()
                         ? Action.EXTRACT_AND_TEST : Action.EXTRACT;
                 for (HttpRequestResponse exchange : batch.exchanges()) {
                     queue.submit(() -> {
                         if (run.cancelled()) return;
+                        String description = exchange.request().method() + " "
+                                + exchange.request().url();
+                        listener.itemStarted(started.incrementAndGet(), total, description);
+                        listener.itemStage(options.runReflectionTests()
+                                ? "Discovery + reflection testing" : "Parameter discovery",
+                                description);
                         List<ParameterCandidate> candidates = execute(exchange, action);
                         if (!run.cancelled() && options.runSstiTests()) {
+                            listener.itemStage("SSTI testing", description);
                             sstiCoordinator.testPage(candidates, sstiConfig.snapshot());
                         }
                         if (!run.cancelled() && options.runDatabaseTests()) {
+                            listener.itemStage("Database error testing", description);
                             databaseCoordinator.testPage(candidates, databaseConfig.snapshot());
                         }
                         if (run.cancelled()) return;

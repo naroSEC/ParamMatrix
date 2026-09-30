@@ -61,6 +61,8 @@ Proxy response or context-menu selection
 The History Scan entry point first merges Proxy History and Site Map/crawl records, applies method and
 path exclusions, and deduplicates them by `PageIdentity`. Eligible exchanges then enter the same
 controller and worker queue as manual analysis, preserving page isolation and all active-test limits.
+`ScanCollectionProgress` events report source loading, record reading, filtering, Cookie updates, and
+page-test stages without sending Swing work to worker threads directly.
 For each Scan run, `ScanCookieRefresher` can retain recorded cookies, replace only the test copy's
 Cookie header with unexpired Burp Cookie Jar values matching the request host and path, or apply a
 visible user-entered Cookie value to one exact host. Recorded Burp traffic remains unchanged, and

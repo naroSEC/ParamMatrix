@@ -24,25 +24,42 @@ public final class HistoryScanService {
     }
 
     public ScanBatch collect(ScanOptions options) {
+        return collect(options, new ScanProgressListener() { });
+    }
+
+    public ScanBatch collect(ScanOptions options, ScanProgressListener listener) {
         List<HttpRequestResponse> source = new ArrayList<>();
         int withoutResponse = 0;
 
         if (options.proxyHistory()) {
-            for (ProxyHttpRequestResponse item : api.proxy().history()) {
+            listener.collectionProgress(new ScanCollectionProgress(
+                    "Loading Proxy History from Burp", 0, 0));
+            List<ProxyHttpRequestResponse> history = api.proxy().history();
+            reportCollection(listener, "Reading Proxy History", 0, history.size());
+            int read = 0;
+            for (ProxyHttpRequestResponse item : history) {
                 if (!item.hasResponse() || item.response() == null) {
                     withoutResponse++;
-                    continue;
+                } else {
+                    source.add(HttpRequestResponse.httpRequestResponse(
+                            item.finalRequest(), item.response()));
                 }
-                source.add(HttpRequestResponse.httpRequestResponse(item.finalRequest(), item.response()));
+                reportCollection(listener, "Reading Proxy History", ++read, history.size());
             }
         }
         if (options.siteMap()) {
-            for (HttpRequestResponse item : api.siteMap().requestResponses()) {
+            listener.collectionProgress(new ScanCollectionProgress(
+                    "Loading Site Map / Crawl records from Burp", 0, 0));
+            List<HttpRequestResponse> siteMap = api.siteMap().requestResponses();
+            reportCollection(listener, "Reading Site Map / Crawl", 0, siteMap.size());
+            int read = 0;
+            for (HttpRequestResponse item : siteMap) {
                 if (!item.hasResponse() || item.response() == null) {
                     withoutResponse++;
-                    continue;
+                } else {
+                    source.add(item);
                 }
-                source.add(item);
+                reportCollection(listener, "Reading Site Map / Crawl", ++read, siteMap.size());
             }
         }
 
@@ -51,21 +68,29 @@ public final class HistoryScanService {
         int excludedByMethod = 0;
         int excludedByPath = 0;
         int duplicates = 0;
+        reportCollection(listener, "Filtering methods, paths, and duplicates", 0, source.size());
+        int filtered = 0;
         for (HttpRequestResponse item : source) {
             String method = item.request().method().toUpperCase(Locale.ROOT);
             if ((method.equals("GET") && !options.get())
                     || (method.equals("POST") && !options.post())
                     || (!method.equals("GET") && !method.equals("POST"))) {
                 excludedByMethod++;
+                reportCollection(listener, "Filtering methods, paths, and duplicates",
+                        ++filtered, source.size());
                 continue;
             }
             if (exclusions.excludes(item.request().pathWithoutQuery())) {
                 excludedByPath++;
+                reportCollection(listener, "Filtering methods, paths, and duplicates",
+                        ++filtered, source.size());
                 continue;
             }
             PageIdentity identity = PageIdentity.from(item.request(),
                     config.identityIgnoresParameterValues.get());
             if (eligible.putIfAbsent(identity, item) != null) duplicates++;
+            reportCollection(listener, "Filtering methods, paths, and duplicates",
+                    ++filtered, source.size());
         }
         List<HttpRequestResponse> exchanges = List.copyOf(eligible.values());
         int cookieHeadersUpdated = 0;
@@ -75,6 +100,11 @@ public final class HistoryScanService {
             ScanCookieRefresher refresher = new ScanCookieRefresher();
             List<HttpRequestResponse> refreshed = new ArrayList<>(exchanges.size());
             ZonedDateTime now = ZonedDateTime.now();
+            String cookieStage = options.cookieMode() == ScanCookieMode.BURP_COOKIE_JAR
+                    ? "Refreshing cookies from Burp Cookie Jar"
+                    : "Applying custom Cookie header";
+            reportCollection(listener, cookieStage, 0, exchanges.size());
+            int processed = 0;
             for (HttpRequestResponse exchange : exchanges) {
                 ScanCookieRefresher.RefreshResult result = switch (options.cookieMode()) {
                     case BURP_COOKIE_JAR -> refresher.refresh(exchange, cookies, now);
@@ -89,6 +119,7 @@ public final class HistoryScanService {
                 } else {
                     refreshed.add(exchange);
                 }
+                reportCollection(listener, cookieStage, ++processed, exchanges.size());
             }
             exchanges = List.copyOf(refreshed);
         }
@@ -96,5 +127,16 @@ public final class HistoryScanService {
                 excludedByMethod, excludedByPath, duplicates, withoutResponse,
                 cookieHeadersUpdated);
         return new ScanBatch(exchanges, summary);
+    }
+
+    private void reportCollection(ScanProgressListener listener, String stage,
+                                  int completed, int total) {
+        if (total == 0) {
+            listener.collectionProgress(new ScanCollectionProgress(stage + " (no records)", 1, 1));
+            return;
+        }
+        if (completed == 0 || completed == 1 || completed == total || completed % 50 == 0) {
+            listener.collectionProgress(new ScanCollectionProgress(stage, completed, total));
+        }
     }
 }

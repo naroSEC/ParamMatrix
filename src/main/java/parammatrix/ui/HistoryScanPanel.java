@@ -5,6 +5,7 @@ import parammatrix.config.SstiConfig;
 import parammatrix.config.DatabaseStressConfig;
 import parammatrix.scan.ScanOptions;
 import parammatrix.scan.ScanCookieMode;
+import parammatrix.scan.ScanCollectionProgress;
 import parammatrix.scan.ScanProgressListener;
 import parammatrix.scan.ScanSummary;
 
@@ -332,7 +333,27 @@ public final class HistoryScanPanel extends JPanel {
 
     private final class UiProgress implements ScanProgressListener {
         @Override public void collectionStarted() {
-            onEdt(() -> status.setText("Collecting Proxy History and Site Map records..."));
+            onEdt(() -> {
+                progress.setIndeterminate(true);
+                progress.setString("Starting collection...");
+                status.setText("Preparing to read Burp records");
+            });
+        }
+
+        @Override public void collectionProgress(ScanCollectionProgress value) {
+            onEdt(() -> {
+                progress.setIndeterminate(value.indeterminate());
+                status.setText(value.stage());
+                if (value.indeterminate()) {
+                    progress.setString(value.stage() + "...");
+                } else {
+                    progress.setMinimum(0);
+                    progress.setMaximum(Math.max(1, value.total()));
+                    progress.setValue(value.completed());
+                    progress.setString(value.stage() + "  " + value.completed() + " / "
+                            + value.total() + "  (" + percent(value.completed(), value.total()) + "%)");
+                }
+            });
         }
 
         @Override public void scanStarted(ScanSummary value) {
@@ -341,16 +362,28 @@ public final class HistoryScanPanel extends JPanel {
                 progress.setMinimum(0);
                 progress.setMaximum(Math.max(1, value.eligiblePages()));
                 progress.setValue(0);
-                progress.setString("0 / " + value.eligiblePages());
-                status.setText("Scanning eligible pages");
+                progress.setString("Pages completed  0 / " + value.eligiblePages() + "  (0%)");
+                status.setText("Starting tests for " + value.eligiblePages() + " eligible pages");
                 summary.setText(summaryText(value));
             });
+        }
+
+        @Override public void itemStarted(int started, int total, String description) {
+            onEdt(() -> status.setText("Started page " + started + " / " + total
+                    + ": " + shorten(description)));
+        }
+
+        @Override public void itemStage(String stage, String description) {
+            onEdt(() -> status.setText(stage + ": " + shorten(description)));
         }
 
         @Override public void itemCompleted(int completed, int total) {
             onEdt(() -> {
                 progress.setValue(completed);
-                progress.setString(completed + " / " + total);
+                progress.setString("Pages completed  " + completed + " / " + total
+                        + "  (" + percent(completed, total) + "%)");
+                status.setText("Completed " + completed + " of " + total
+                        + " pages; active workers are continuing");
             });
         }
 
@@ -391,6 +424,15 @@ public final class HistoryScanPanel extends JPanel {
                     + "  |  Duplicates: " + value.duplicates()
                     + "  |  No response: " + value.withoutResponse()
                     + "  |  Cookie headers updated: " + value.cookieHeadersUpdated();
+        }
+
+        private int percent(int completed, int total) {
+            return total <= 0 ? 0 : Math.min(100, (int) ((long) completed * 100 / total));
+        }
+
+        private String shorten(String value) {
+            if (value == null) return "";
+            return value.length() <= 140 ? value : value.substring(0, 137) + "...";
         }
     }
 }
